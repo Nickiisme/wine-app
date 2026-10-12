@@ -1,0 +1,8 @@
+.pnpm-store/
+
+# Local visual QA captures
+prototype/*-raw.png
+prototype/*-whole.png
+prototype/*-screen.png
+prototype/design-qa-*.png
+prototype/implementation-*.png
