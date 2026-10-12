@@ -4,10 +4,12 @@ import { MobileScroll } from "./mobile";
 
 type Occasion = "steak" | "party" | "solo";
 
+const wineAsset = (file: string) => `${import.meta.env.BASE_URL}assets/wine/${file}`;
+
 const occasions: Array<{ id: Occasion; title: string; subtitle: string; image: string }> = [
-  { id: "steak", title: "今晚牛排", subtitle: "经典搭配", image: "/assets/wine/hero-steak-wine.png" },
-  { id: "party", title: "周末聚会", subtitle: "多人分享", image: "/assets/wine/red-bordeaux.png" },
-  { id: "solo", title: "一个人小酌", subtitle: "放松时刻", image: "/assets/wine/white-sauvignon.png" },
+  { id: "steak", title: "今晚牛排", subtitle: "经典搭配", image: wineAsset("hero-steak-wine.png") },
+  { id: "party", title: "周末聚会", subtitle: "多人分享", image: wineAsset("red-bordeaux.png") },
+  { id: "solo", title: "一个人小酌", subtitle: "放松时刻", image: wineAsset("white-sauvignon.png") },
 ];
 
 const recommendations = {
@@ -17,8 +19,8 @@ const recommendations = {
 };
 
 const wines = [
-  { id: "lynch-bages", badge: "经典之选", name: "靓茨伯庄园 2020", origin: "法国  波雅克 · 1855 五级庄", notes: "黑加仑 ｜ 黑樱桃 ｜ 雪松 ｜ 单宁细腻", quote: "结构扎实，与牛排的鲜味相得益彰。", price: 899, original: "¥1,180", distance: "杭州·西湖 3.2km", image: "/assets/wine/red-bordeaux.png" },
-  { id: "cloudy-bay", badge: "人气推荐", name: "云雾之湾 长相思 2024", origin: "新西兰  马尔堡", notes: "柑橘 ｜ 百香果 ｜ 青苹果 ｜ 清新爽脆", quote: "充满活力的果香，平衡油脂感。", price: 249, original: "¥320", distance: "杭州·西湖 2.6km", image: "/assets/wine/white-sauvignon.png" },
+  { id: "lynch-bages", badge: "经典之选", name: "靓茨伯庄园 2020", origin: "法国  波雅克 · 1855 五级庄", notes: "黑加仑 ｜ 黑樱桃 ｜ 雪松 ｜ 单宁细腻", quote: "结构扎实，与牛排的鲜味相得益彰。", price: 899, original: "¥1,180", distance: "杭州·西湖 3.2km", image: wineAsset("red-bordeaux.png") },
+  { id: "cloudy-bay", badge: "人气推荐", name: "云雾之湾 长相思 2024", origin: "新西兰  马尔堡", notes: "柑橘 ｜ 百香果 ｜ 青苹果 ｜ 清新爽脆", quote: "充满活力的果香，平衡油脂感。", price: 249, original: "¥320", distance: "杭州·西湖 2.6km", image: wineAsset("white-sauvignon.png") },
 ];
 
 type OrdersScreenProps = { onRepeat: () => void; onNotice: (message: string) => void };
@@ -38,14 +40,14 @@ function OrdersScreen({ onRepeat, onNotice }: OrdersScreenProps) {
           <div className="progress-line"><i className="done" /><i className="done" /><i /></div>
           <div className="progress-labels"><span>商家已接单<small>10月12日 18:24</small></span><span>待骑手取货<small>杭州·西湖仓</small></span><span>送达<small>明天</small></span></div>
         </div>
-        <div className="order-product"><img src="/assets/wine/red-bordeaux.png" alt="靓茨伯庄园 2020" /><div><h2>靓茨伯庄园 2020</h2><p>法国·波雅克 · 750ml × 1</p><span>正品保障 · 恒温配送</span></div><strong>¥899</strong></div>
+        <div className="order-product"><img src={wineAsset("red-bordeaux.png")} alt="靓茨伯庄园 2020" /><div><h2>靓茨伯庄园 2020</h2><p>法国·波雅克 · 750ml × 1</p><span>正品保障 · 恒温配送</span></div><strong>¥899</strong></div>
         <div className="order-meta"><span>订单号 202610120038</span><b>实付 ¥899</b></div>
         <div className="order-actions"><button type="button" onClick={() => onNotice("已为你联系配送骑手")}>联系配送</button><button type="button" className="primary" onClick={() => onNotice("配送轨迹已更新")}>查看物流</button></div>
       </section>}
 
       {(filter === "all" || filter === "done") && <section className="past-orders">
         <div className="list-title"><div><p>PAST ORDERS</p><h2>最近购买</h2></div><button type="button">查看全部 <ChevronRightIcon /></button></div>
-        <article className="past-order"><img src="/assets/wine/white-sauvignon.png" alt="云雾之湾 长相思 2024" /><div><h3>云雾之湾 长相思 2024</h3><p>已于 10月6日送达</p><span>¥249 · 共1件</span></div><button type="button" onClick={onRepeat}><ReloadIcon /> 再来一单</button></article>
+        <article className="past-order"><img src={wineAsset("white-sauvignon.png")} alt="云雾之湾 长相思 2024" /><div><h3>云雾之湾 长相思 2024</h3><p>已于 10月6日送达</p><span>¥249 · 共1件</span></div><button type="button" onClick={onRepeat}><ReloadIcon /> 再来一单</button></article>
       </section>}
 
       {filter === "refund" && <section className="empty-state"><ArchiveIcon /><h2>暂无售后记录</h2><p>退款、退货及其他售后进度会显示在这里</p><button type="button" onClick={() => setFilter("all")}>查看全部订单</button></section>}
@@ -111,12 +113,12 @@ function SupplierScreen({ onBack, onNotice }: { onBack: () => void; onNotice: (m
       </section>
       <section className="merchant-panel">
         <div className="merchant-section-title"><div><p>FULFILLMENT</p><h2>待处理订单</h2></div><button type="button" onClick={() => onNotice("订单管理已打开")}>全部订单 <ChevronRightIcon /></button></div>
-        <article className="merchant-order"><img src="/assets/wine/red-bordeaux.png" alt="靓茨伯庄园 2020" /><div><span>明日达 · 需16:30前出库</span><h3>靓茨伯庄园 2020 × 1</h3><p>订单尾号 0038 · 上海路配送点</p></div><button type="button" onClick={() => onNotice("订单已进入备货流程")}>开始备货</button></article>
-        <article className="merchant-order"><img src="/assets/wine/white-sauvignon.png" alt="云雾之湾 长相思 2024" /><div><span>后日达 · 需今日出库</span><h3>云雾之湾 长相思 2024 × 2</h3><p>订单尾号 0041 · 文三路配送点</p></div><button type="button" onClick={() => onNotice("订单已进入备货流程")}>开始备货</button></article>
+        <article className="merchant-order"><img src={wineAsset("red-bordeaux.png")} alt="靓茨伯庄园 2020" /><div><span>明日达 · 需16:30前出库</span><h3>靓茨伯庄园 2020 × 1</h3><p>订单尾号 0038 · 上海路配送点</p></div><button type="button" onClick={() => onNotice("订单已进入备货流程")}>开始备货</button></article>
+        <article className="merchant-order"><img src={wineAsset("white-sauvignon.png")} alt="云雾之湾 长相思 2024" /><div><span>后日达 · 需今日出库</span><h3>云雾之湾 长相思 2024 × 2</h3><p>订单尾号 0041 · 文三路配送点</p></div><button type="button" onClick={() => onNotice("订单已进入备货流程")}>开始备货</button></article>
       </section>
       <section className="stock-alert">
         <div className="merchant-section-title"><div><p>INVENTORY ALERT</p><h2>库存提醒</h2></div><button type="button" onClick={() => onNotice("库存管理已打开")}>管理库存 <ChevronRightIcon /></button></div>
-        <div className="stock-row"><img src="/assets/wine/red-bordeaux.png" alt="奔富 BIN 389" /><div><h3>奔富 BIN 389</h3><p>杭州仓 · 剩余 6 瓶</p></div><span>建议清仓</span></div>
+        <div className="stock-row"><img src={wineAsset("red-bordeaux.png")} alt="奔富 BIN 389" /><div><h3>奔富 BIN 389</h3><p>杭州仓 · 剩余 6 瓶</p></div><span>建议清仓</span></div>
       </section>
       <button className="supplier-primary" type="button" onClick={() => onNotice("发布商品表单已打开")}><PlusIcon /> 发布本地现货</button>
     </main>
@@ -144,7 +146,7 @@ export default function Prototype() {
       <MobileScroll className="app-screen" key={tab}>
         {tab === "home" || tab === "wine" ? <main className="wine-home" aria-label="身边酒窖消费者首页">
           <section className="hero" aria-label="今晚牛排配酒推荐">
-            <img className="hero-image" src="/assets/wine/hero-steak-wine.png" alt="牛排、红酒杯与葡萄酒瓶" />
+            <img className="hero-image" src={wineAsset("hero-steak-wine.png")} alt="牛排、红酒杯与葡萄酒瓶" />
             <div className="hero-content">
               <button className="location-button" type="button" aria-label="切换配送位置"><SewingPinFilledIcon /><span>杭州·西湖</span><ChevronDownIcon /></button>
               <p className="delivery-note">附近优质酒庄 · 专注正品 · 明日达</p>
@@ -184,7 +186,7 @@ export default function Prototype() {
             </div>
           </section>
 
-          <section className="brand-banner" aria-label="品牌主张"><img src="/assets/wine/hero-steak-wine.png" alt="葡萄酒生活场景" /><div><p>身边的好酒&nbsp;&nbsp;更近的生活</p><small>NEIGHBORHOOD SOMMELIER</small></div></section>
+          <section className="brand-banner" aria-label="品牌主张"><img src={wineAsset("hero-steak-wine.png")} alt="葡萄酒生活场景" /><div><p>身边的好酒&nbsp;&nbsp;更近的生活</p><small>NEIGHBORHOOD SOMMELIER</small></div></section>
         </main> : tab === "orders" ? <OrdersScreen onRepeat={() => addToCart("cloudy-bay", "云雾之湾 长相思 2024")} onNotice={setNotice} /> : tab === "supplier" ? <SupplierScreen onBack={() => setTab("profile")} onNotice={setNotice} /> : <ProfileScreen onNotice={setNotice} onOpenSupplier={() => setTab("supplier")} />}
       </MobileScroll>
       {tab !== "supplier" && <nav className="bottom-nav" aria-label="主导航">
