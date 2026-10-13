@@ -3,7 +3,7 @@ import { ArrowLeftIcon, BookmarkFilledIcon, CameraIcon, CheckCircledIcon, CheckI
 import { BottomSheet, Carousel, KeyboardInput, KeyboardTextarea, MobileScroll, useKeyboard } from "./mobile";
 import "./locked-overrides.css";
 
-type Screen = "explore" | "confirm" | "taste" | "success" | "profile" | "records";
+type Screen = "explore" | "confirm" | "taste" | "success" | "profile" | "records" | "flavor";
 type ExploreTab = "grapes" | "regions";
 type GrapeNode = { name: string; english: string; image: string; side: "left" | "right"; recent?: boolean; locked?: boolean };
 type GrapeDetail = { intro: string; count: number; taste: string; aromas: string[]; regions: string };
@@ -47,8 +47,9 @@ export default function Prototype() {
       {screen === "confirm" && <ConfirmScreen onBack={() => go("explore")} onNext={() => go("taste")} />}
       {screen === "taste" && <TasteScreen liked={liked} setLiked={setLiked} selectedFlavors={selectedFlavors} toggleFlavor={(flavor) => setSelectedFlavors((current) => current.includes(flavor) ? current.filter((item) => item !== flavor) : [...current, flavor])} note={tastingNote} onNoteChange={setTastingNote} onBack={() => go("confirm")} onSave={() => go("success")} />}
       {screen === "success" && <SuccessScreen onDone={() => go("explore")} />}
-      {screen === "profile" && <ProfileScreen onExplore={() => go("explore")} onRecord={() => setRecordSheet(true)} onRecords={() => { setRecordFilter(null); go("records"); }} />}
+      {screen === "profile" && <ProfileScreen onExplore={() => go("explore")} onRecord={() => setRecordSheet(true)} onRecords={() => { setRecordFilter(null); go("records"); }} onFlavor={() => go("flavor")} />}
       {screen === "records" && <TastingRecordsScreen grape={recordFilter} onBack={() => go(recordFilter ? "explore" : "profile")} />}
+      {screen === "flavor" && <FlavorPreferenceScreen onBack={() => go("profile")} />}
       <BottomSheet open={recordSheet} onOpenChange={setRecordSheet} title="拍摄酒标" description="对准正面酒标，自动识别酒款信息" snap={0.64}>
         <div className="record-camera-flow">
           <button className="camera-preview" onClick={startRecord} aria-label="拍照并识别酒标"><span className="camera-frame"><CameraIcon /></span><strong>将酒标完整放入框内</strong><small>点击拍摄并开始识别</small><span className="camera-shutter"><CameraIcon /></span></button>
@@ -155,7 +156,7 @@ function TasteScreen({ liked, setLiked, selectedFlavors, toggleFlavor, note, onN
 
 function SuccessScreen({ onDone }: { onDone: () => void }) { return <MobileScroll className="app-scroll paper-screen"><main className="success-content"><span className="success-kicker">已点亮新品种</span><img className="success-grape" src={asset("assets/grapes/pinot-noir.png")} alt="黑皮诺葡萄插画" draggable={false} /><h1>黑皮诺</h1><p>Pinot Noir</p><div className="unlock-summary"><CheckIcon /><span>这次品鉴已经加入你的葡萄酒世界</span></div><button className="primary-action" onClick={onDone}>回到我的图鉴</button><button className="text-action" onClick={onDone}>查看这次记录</button></main></MobileScroll>; }
 
-function ProfileScreen({ onExplore, onRecord, onRecords }: { onExplore: () => void; onRecord: () => void; onRecords: () => void }) {
+function ProfileScreen({ onExplore, onRecord, onRecords, onFlavor }: { onExplore: () => void; onRecord: () => void; onRecords: () => void; onFlavor: () => void }) {
   useEffect(() => {
     const resetScroll = window.setTimeout(() => {
       const scroll = document.querySelector<HTMLElement>(".mobile-scroll");
@@ -171,7 +172,7 @@ function ProfileScreen({ onExplore, onRecord, onRecords }: { onExplore: () => vo
     { name: "风味发现者", note: "香气探索", icon: <DrawingPinFilledIcon />, tier: "gray" },
     { name: "初次举杯", note: "旅程开始", icon: <CheckCircledIcon />, tier: "gray" },
   ];
-  return <><MobileScroll className="app-scroll paper-screen"><main className="profile-content"><p className="eyebrow">我的</p><div className="profile-head"><span>N</span><div><h1>Nicki</h1><p>12 个品种 · 8 个产区 · 23 次品鉴</p></div></div><section className="badge-section"><div className="section-title"><h2>我的徽章</h2><button>全部 <span>›</span></button></div><Carousel className="badge-carousel" contentClassName="badge-row" ariaLabel="我的徽章，可左右滑动">{badges.map((badge) => <button className={`badge-item ${badge.tier}`} key={badge.name}><span className="badge-coin"><span>{badge.icon}</span></span><strong>{badge.name}</strong><small>{badge.note}</small></button>)}</Carousel></section><section className="footprint-section"><div className="section-title"><h2>我的足迹</h2></div><div className="footprint-row"><button onClick={onRecords} aria-label="查看23条品鉴记录"><strong>23</strong><span>品鉴记录</span></button><button><strong>12</strong><span>葡萄品种</span></button><button><strong>8</strong><span>探索产区</span></button></div></section><div className="profile-menu">{["我的风味偏好", "分享我的图鉴", "设置"].map((item) => <button key={item}>{item}<span>›</span></button>)}</div></main></MobileScroll><BottomNav active="profile" onExplore={onExplore} onRecord={onRecord} onProfile={() => {}} /></>;
+  return <><MobileScroll className="app-scroll paper-screen"><main className="profile-content"><p className="eyebrow">我的</p><div className="profile-head"><span>N</span><div><h1>Nicki</h1><p>12 个品种 · 8 个产区 · 23 次品鉴</p></div></div><section className="badge-section"><div className="section-title"><h2>我的徽章</h2><button>全部 <span>›</span></button></div><Carousel className="badge-carousel" contentClassName="badge-row" ariaLabel="我的徽章，可左右滑动">{badges.map((badge) => <button className={`badge-item ${badge.tier}`} key={badge.name}><span className="badge-coin"><span>{badge.icon}</span></span><strong>{badge.name}</strong><small>{badge.note}</small></button>)}</Carousel></section><section className="footprint-section"><div className="section-title"><h2>我的足迹</h2></div><div className="footprint-row"><button onClick={onRecords} aria-label="查看23条品鉴记录"><strong>23</strong><span>品鉴记录</span></button><button><strong>12</strong><span>葡萄品种</span></button><button><strong>8</strong><span>探索产区</span></button></div></section><div className="profile-menu"><button onClick={onFlavor}>我的风味偏好<span>›</span></button>{["分享我的图鉴", "设置"].map((item) => <button key={item}>{item}<span>›</span></button>)}</div></main></MobileScroll><BottomNav active="profile" onExplore={onExplore} onRecord={onRecord} onProfile={() => {}} /></>;
 }
 
 function TastingRecordsScreen({ grape, onBack }: { grape: string | null; onBack: () => void }) {
@@ -184,6 +185,12 @@ function TastingRecordsScreen({ grape, onBack }: { grape: string | null; onBack:
   ];
   const records = grape ? allRecords.filter((record) => record.grape === grape) : allRecords;
   return <MobileScroll className="app-scroll paper-screen"><main className="flow-content records-content"><FlowHeader title={grape ? `${grape}的品酒笔记` : "我的品鉴记录"} onBack={onBack} /><p className="records-summary">{grape ? `已找到 ${records.length} 条相关记录` : "最近记录的葡萄酒与品鉴感受"}</p><div className="records-list">{records.map((record) => <button className="record-card" key={`${record.wine}-${record.date}`}><div className="record-card-head"><span>{record.grape}</span><time>{record.date}</time></div><strong>{record.wine}</strong><small>{record.region}</small><p>{record.note}</p></button>)}</div></main></MobileScroll>;
+}
+
+function FlavorPreferenceScreen({ onBack }: { onBack: () => void }) {
+  const flavorTags = [{ name: "红色水果", strength: 5 }, { name: "花香", strength: 4 }, { name: "香料", strength: 3 }, { name: "矿物感", strength: 3 }, { name: "橡木", strength: 2 }, { name: "草本", strength: 2 }];
+  const preferences = [{ left: "清爽", right: "浓郁", value: 42 }, { left: "柔和", right: "单宁明显", value: 36 }, { left: "果味型", right: "咸鲜复杂", value: 48 }, { left: "干型", right: "偏甜", value: 22 }];
+  return <MobileScroll className="app-scroll paper-screen"><main className="flow-content flavor-profile"><FlowHeader title="我的风味偏好" onBack={onBack} /><section className="flavor-summary"><small>你的口味画像</small><h2>轻盈、明亮，又带一点花香</h2><p>你偏爱酸度清爽、红色水果明显、单宁细腻的葡萄酒。</p></section><section className="preference-section"><h3>常出现的风味</h3><div className="preference-tags">{flavorTags.map((tag) => <span className={`strength-${tag.strength}`} key={tag.name}>{tag.name}</span>)}</div></section><section className="preference-section"><h3>你偏爱的口感</h3><div className="preference-scales">{preferences.map((item) => <div className="preference-scale" key={item.left}><div><span>{item.left}</span><span>{item.right}</span></div><i><b style={{ left: `${item.value}%` }} /></i></div>)}</div></section><section className="preference-section"><h3>更常喜欢</h3><div className="favorite-list"><div><span>葡萄品种</span><strong>黑皮诺 · 霞多丽</strong></div><div><span>产区</span><strong>勃艮第 · 中奥塔哥</strong></div><div><span>风格</span><strong>清爽 · 少橡木 · 红色果香</strong></div></div></section><p className="preference-footnote">根据你的 23 次品鉴记录自动生成，继续记录会让画像更准确。</p></main></MobileScroll>;
 }
 
 function FlowHeader({ title, onBack }: { title: string; onBack: () => void }) { return <header className="flow-header"><button onClick={onBack} aria-label="返回"><ArrowLeftIcon /></button><h1>{title}</h1><span /></header>; }
