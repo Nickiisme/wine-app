@@ -2,22 +2,18 @@
 
 Environment: `wine-app-d6grgbodge1334980`
 
-The web client never contains a Tencent Cloud `SecretId` or `SecretKey`. It uses
-CloudBase authentication and collection security rules instead.
+The web client never contains a Tencent Cloud `SecretId`, `SecretKey`, or server
+API Key. It uses CloudBase authentication and PostgreSQL RLS instead.
 
-## Required console setup
+## Required console setup (PostgreSQL)
 
 1. Open the CloudBase console for the environment above.
 2. Under **身份认证 / 登录方式**, enable **匿名登录** for development.
-3. Under **数据库**, create a collection named `tasting_records`.
-4. Choose custom security rules and paste the contents of
-   `database-rules/tasting_records.json`.
-5. Add an ascending/descending index for `createdAt` if the console reports that
-   the owner-filtered, date-sorted query needs one.
+3. Create the PostgreSQL application tables in the SQL editor.
+4. Run `postgresql-permissions.sql` to grant frontend access and enable RLS.
 
-Do not set the collection to public read/write. The client query explicitly
-filters `_openid` to the current CloudBase UID, and the rules enforce the same
-ownership boundary.
+The client signs in anonymously and RLS compares each row's `user_id` with
+`auth.uid()`. Never put a `service_role` API Key in H5 or App code.
 
 ## Runtime configuration
 

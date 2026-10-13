@@ -7,13 +7,20 @@ export const cloudbaseApp = cloudbase.init({
   env: CLOUDBASE_ENV_ID,
 });
 
+type CloudbasePostgres = ReturnType<typeof cloudbaseApp.rdb>;
+
+/** CloudBase exposes rdb as a factory at runtime; the current declaration is stale. */
+export function getCloudbasePostgres(): CloudbasePostgres {
+  return (cloudbaseApp.rdb as unknown as () => CloudbasePostgres)();
+}
+
 let authPromise: Promise<string> | null = null;
 
 /** Ensures every browser has an authenticated CloudBase identity before data access. */
 export function ensureCloudbaseUser(): Promise<string> {
   if (!authPromise) {
     authPromise = (async () => {
-      const auth = cloudbaseApp.auth();
+      const auth = cloudbaseApp.auth({ persistence: "local" });
       const currentUser = await auth.getCurrentUser();
       let uid = currentUser?.uid;
 
