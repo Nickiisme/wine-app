@@ -94,8 +94,10 @@ export default function Prototype() {
       });
       setRecords((current) => [saved, ...current]);
       go("success");
-    } catch {
-      setCloudMessage("保存失败，请检查 CloudBase 匿名登录、集合和安全规则");
+    } catch (error) {
+      console.error("CloudBase tasting record save failed", error);
+      const detail = error instanceof Error ? error.message : typeof error === "object" && error && "message" in error ? String(error.message) : "未知错误";
+      setCloudMessage(`保存失败：${detail}`);
     } finally {
       setSavingRecord(false);
     }
@@ -133,8 +135,8 @@ function ExploreScreen({ tab, records, onTab, onRecord, onProfile, onNotes }: { 
   const selectedCount = selectedGrape ? stats.grapeCounts[selectedGrape.name] ?? 0 : 0;
   const selectedLocked = selectedCount === 0;
   return <>
-    <MobileScroll className="app-scroll paper-screen">
-      <main className="explore-content">
+    <MobileScroll className={`app-scroll paper-screen ${tab === "regions" ? "region-page" : ""}`}>
+      <main className={`explore-content ${tab === "regions" ? "region-explore-content" : ""}`}>
         <header className="welcome"><p className="eyebrow">晚上好，Nicki</p><h1>你的葡萄酒世界已点亮：</h1><p className="stats"><strong>{stats.grapeCount}</strong> 个品种 <i>·</i> <strong>{stats.regionCount}</strong> 个产区 <i>·</i> <strong>{stats.recordCount}</strong> 次品鉴</p></header>
         <div className="atlas-tabs" role="tablist" aria-label="图鉴视图"><button className={tab === "grapes" ? "active" : ""} onClick={() => onTab("grapes")}>品种图鉴</button><button className={tab === "regions" ? "active" : ""} onClick={() => onTab("regions")}>产区地图</button></div>
         {tab === "grapes" ? <GrapeAtlas records={records} onSelect={setSelectedGrape} /> : <RegionMap records={records} />}
