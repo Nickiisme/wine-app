@@ -545,6 +545,39 @@
 .record-alternatives { display: grid; gap: 8px; }
 .record-alternatives .record-option { padding-top: 11px; padding-bottom: 11px; }
 
+/* Present the prototype as a clean app canvas instead of a device mockup. */
+.phone-stage {
+  padding: 0 !important;
+  background: #fbf7ef;
+}
+
+.device-menu-bar,
+.phone-bezel,
+.device-camera {
+  display: none !important;
+}
+
+.phone-scale-box {
+  width: min(393px, 100vw) !important;
+  height: min(852px, 100dvh) !important;
+}
+
+.phone-device {
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  transform: none !important;
+}
+
+.device-screen {
+  left: 0 !important;
+  top: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
 .region-node {
   position: absolute;
   width: 112px;
