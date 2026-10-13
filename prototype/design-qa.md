@@ -1,62 +1,44 @@
 # Design QA
 
-**Source visual truth**
+- Source visual truth: `/Users/nicki/.codex/generated_images/01a132f8-eee2-7920-a503-793e02a85727/exec-d846be24-5720-430f-978c-622bbd6e8d59.png`
+- Implementation: `http://localhost:4173/`
+- Viewport: 1400 × 1200 browser viewport; phone screen verified at 393 × 852 CSS px, device scale factor 1
+- Source pixels: 853 × 1898; implementation phone viewport: 393 × 852 CSS px
+- Density normalization: compared at the phone-content level; the source is a taller concept image and the new detail states have no direct source frame
+- State: unlocked grape bottom sheet and France region zoom view
+- Browser evidence: in-app browser capture at 393 × 852; primary interactions tested; browser console checked with no warnings or errors
 
-- `/Users/nicki/.codex/generated_images/01a132f8-eee2-7920-a503-793e02a85727/exec-3325e812-5392-4671-940a-6d197f53c162.png`
+## Full-view comparison
 
-**Implementation evidence**
+The new states preserve the established cream paper background, burgundy accents, compact typography, rounded controls, and bottom navigation. The content density remains intentionally lighter than the original concept image, matching the later direction to reduce illustration dominance.
 
-- `/Users/nicki/Documents/ChatGPT/wine-app/prototype/implementation-browser-final.png`
-- `/Users/nicki/Documents/ChatGPT/wine-app/prototype/design-qa-comparison-final.png`
+## Focused-region comparison
 
-**Viewport and normalization**
+Focused checks were performed on the grape detail sheet and the enlarged country map. The grape image remains secondary to the text, while the country view retains the same map-card visual language and clearly exposes a back action. A direct pixel match is not applicable because neither interaction state exists in the source image.
 
-- Mobile runtime: iPhone content viewport, 393 × 852 CSS px at device scale factor 1.
-- Source image: 853 × 1844 px, normalized to 393 × 852 px for comparison.
-- Implementation browser capture: 1400 × 1200 px; app content compared at the runtime's 393 × 852 CSS target.
-- State: Explore home, `品种图鉴` selected, no sheet or keyboard visible.
+## Findings
 
-**Full-view comparison evidence**
+- No P0/P1/P2 issues remain.
+- Typography: hierarchy and small-label weights are consistent with the existing app.
+- Spacing: the detail sheet and country map use the existing compact rhythm without crowding.
+- Colors: existing wine, paper, line, and muted tokens are reused.
+- Image quality: existing grape assets remain sharp at the reduced 92 px detail size.
+- Copy: unlocked, locked, and regional exploration states are explicit and concise.
 
-- The implementation preserves the source hierarchy: greeting and collection totals, two-view switcher, vertically alternating grape atlas, restrained wine-red route, fixed central record action, and minimal profile navigation.
-- The final implementation intentionally uses smaller standalone botanical illustrations with more whitespace, matching the user's refinement from the generated source.
-- The runtime-owned status bar, device bezel, and home indicator are expected template infrastructure and are excluded from app-owned fidelity judgments.
+## Interaction checks
 
-**Focused comparison evidence**
+- Clicking an unlocked grape opens its introduction, tasting count, and encountered regions.
+- Clicking a locked grape opens a clear “待探索” explanation without revealing a detailed profile.
+- Clicking a country enlarges the map into its regional view.
+- The enlarged map returns to the world map through the top-left back control.
+- Browser console: no warnings or errors.
 
-- Header: typography, totals, wine-red emphasis, spacing, and tab hierarchy were checked at 1:1 content size.
-- Atlas: six node positions, unique unlocked illustrations, restrained recent-unlock sparkle, labels, and the generic muted locked state were checked individually.
-- Bottom navigation: persistent Explore, central record action, and Profile affordances remain visible without content overlap.
+## Comparison history
 
-**Findings**
+- Initial pass: no actionable P0/P1/P2 findings in the two added interaction states.
 
-- No actionable P0, P1, or P2 issues remain.
-- [P3] The production path is more geometric than the loose hand-drawn curve in the concept image. This is acceptable for the interactive prototype and makes node spacing more stable.
+## Follow-up polish
 
-**Interaction verification**
-
-- Switched between `品种图鉴` and `产区地图`.
-- Opened the `记录一杯` sheet and selected `拍摄酒标`.
-- Confirmed editable wine metadata.
-- Selected liking and flavor states, saved the tasting, and reached the `已点亮新品种` result.
-- Returned to the atlas and verified the simulated keyboard dismissed correctly.
-- Opened the Profile tab.
-- Browser console warnings/errors checked: none.
-
-**Comparison history**
-
-1. Initial pass found a P2 interaction issue: returning from an edited field could leave the simulated keyboard transition visible over the atlas.
-2. Fixed by dismissing the runtime keyboard before every screen transition and re-tested the complete recording flow.
-3. Initial atlas assets also appeared inside circular crops, which conflicted with the selected standalone-sketch direction. Removed the crop/background treatment, reduced node density, and re-captured the home state.
-4. Post-fix evidence is captured in `implementation-browser-final.png`; no actionable P0/P1/P2 issues remain.
-
-**Implementation checklist**
-
-- [x] Mobile runtime integrity preserved.
-- [x] Primary navigation and tabs work.
-- [x] Core recording flow works end to end.
-- [x] Keyboard-aware fields and dismissal work.
-- [x] Unique grape assets and uniform locked treatment are present.
-- [x] No browser console errors.
+- P3: future region nodes can use real geographic positions once production map data is introduced.
 
 final result: passed

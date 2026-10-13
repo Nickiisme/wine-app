@@ -7,6 +7,13 @@ type Screen = "explore" | "confirm" | "taste" | "success" | "profile";
 type ExploreTab = "grapes" | "regions";
 type GrapeNode = { name: string; english: string; image: string; side: "left" | "right"; recent?: boolean; locked?: boolean };
 const asset = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, "")}`;
+const grapeDetails: Record<string, { intro: string; count: number; regions: string }> = {
+  赤霞珠: { intro: "果味浓郁、单宁清晰，常带有黑加仑、雪松与香料气息。", count: 4, regions: "宁夏 · 波尔多 · 纳帕谷" },
+  梅洛: { intro: "口感圆润柔和，常让人想到李子、黑樱桃和可可。", count: 2, regions: "波尔多 · 智利中央谷" },
+  黑皮诺: { intro: "轻盈细腻，常带有草莓、樱桃、花香和淡淡泥土气息。", count: 3, regions: "勃艮第 · 中奥塔哥" },
+  霞多丽: { intro: "风格变化丰富，可以清爽如柑橘，也可以圆润并带有奶油香。", count: 2, regions: "勃艮第 · 澳大利亚" },
+  长相思: { intro: "酸度明亮，常出现柑橘、青草、百香果与草本香气。", count: 1, regions: "马尔堡" },
+};
 
 const grapeNodes: GrapeNode[] = [
   { name: "赤霞珠", english: "Cabernet Sauvignon", image: asset("assets/grapes/cabernet.png"), side: "left" },
@@ -54,25 +61,40 @@ function RecordOption({ icon, title, detail, primary, onClick }: { icon: ReactNo
 }
 
 function ExploreScreen({ tab, onTab, onRecord, onProfile }: { tab: ExploreTab; onTab: (tab: ExploreTab) => void; onRecord: () => void; onProfile: () => void }) {
+  const [selectedGrape, setSelectedGrape] = useState<GrapeNode | null>(null);
+  const detail = selectedGrape ? grapeDetails[selectedGrape.name] : null;
   return <>
     <MobileScroll className="app-scroll paper-screen">
       <main className="explore-content">
         <header className="welcome"><p className="eyebrow">晚上好，Nicki</p><h1>你的葡萄酒世界已点亮：</h1><p className="stats"><strong>12</strong> 个品种 <i>·</i> <strong>8</strong> 个产区 <i>·</i> <strong>23</strong> 次品鉴</p></header>
         <div className="atlas-tabs" role="tablist" aria-label="图鉴视图"><button className={tab === "grapes" ? "active" : ""} onClick={() => onTab("grapes")}>品种图鉴</button><button className={tab === "regions" ? "active" : ""} onClick={() => onTab("regions")}>产区地图</button></div>
-        {tab === "grapes" ? <GrapeAtlas /> : <RegionMap />}
+        {tab === "grapes" ? <GrapeAtlas onSelect={setSelectedGrape} /> : <RegionMap />}
       </main>
     </MobileScroll>
     <BottomNav active="explore" onExplore={() => onTab(tab)} onRecord={onRecord} onProfile={onProfile} />
+    <BottomSheet open={!!selectedGrape} onOpenChange={(open) => { if (!open) setSelectedGrape(null); }} title={selectedGrape?.name ?? "品种介绍"} description={selectedGrape?.english} snap={0.5}>
+      {selectedGrape && (selectedGrape.locked ? <div className="grape-detail locked-detail"><span className="detail-question">?</span><h3>{selectedGrape.name}</h3><p>这是一个待探索品种。第一次记录它时，就会在图鉴中点亮。</p></div> : <div className="grape-detail"><div className="grape-detail-hero"><img src={selectedGrape.image} alt={`${selectedGrape.name}葡萄简笔画`} draggable={false} /><p>{detail?.intro}</p></div><div className="grape-detail-facts"><div><small>你品鉴过</small><strong>{detail?.count ?? 0} 次</strong></div><div><small>遇见它的地方</small><strong>{detail?.regions}</strong></div></div></div>)}
+    </BottomSheet>
   </>;
 }
 
-function GrapeAtlas() {
-  return <section className="grape-atlas" aria-label="葡萄品种探索路径"><div className="path-line" aria-hidden="true" />{grapeNodes.map((grape, index) => <button key={`${grape.name}-${index}`} className={`grape-node ${grape.side} ${grape.locked ? "locked" : ""} ${grape.recent ? "recent" : ""}`} aria-label={`${grape.name}${grape.locked ? "，待探索" : ""}`}><span className="grape-art-wrap"><img src={grape.image} alt="" draggable={false} />{grape.recent && <span className="recent-spark">✦</span>}{grape.locked && <span className="locked-mark">?</span>}</span><strong>{grape.name}</strong><small>{grape.locked ? `${grape.english} · 待探索` : grape.english}</small></button>)}</section>;
+function GrapeAtlas({ onSelect }: { onSelect: (grape: GrapeNode) => void }) {
+  return <section className="grape-atlas" aria-label="葡萄品种探索路径"><div className="path-line" aria-hidden="true" />{grapeNodes.map((grape, index) => <button key={`${grape.name}-${index}`} onClick={() => onSelect(grape)} className={`grape-node ${grape.side} ${grape.locked ? "locked" : ""} ${grape.recent ? "recent" : ""}`} aria-label={`${grape.name}${grape.locked ? "，待探索" : ""}`}><span className="grape-art-wrap"><img src={grape.image} alt="" draggable={false} />{grape.recent && <span className="recent-spark">✦</span>}{grape.locked && <span className="locked-mark">?</span>}</span><strong>{grape.name}</strong><small>{grape.locked ? `${grape.english} · 待探索` : grape.english}</small></button>)}</section>;
 }
 
 function RegionMap() {
+  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const regions = [{ country: "法国", count: 5, x: "32%", y: "25%" }, { country: "意大利", count: 2, x: "57%", y: "36%" }, { country: "中国", count: 3, x: "75%", y: "45%" }, { country: "美国", count: 1, x: "17%", y: "43%" }, { country: "澳大利亚", count: 1, x: "77%", y: "73%" }, { country: "新西兰", count: 2, x: "88%", y: "81%" }];
-  return <section className="region-map" aria-label="世界葡萄酒产区地图"><div className="map-heading"><GlobeIcon /><span>我的葡萄酒足迹</span></div><div className="world-shape" aria-hidden="true"><span className="continent americas" /><span className="continent europe" /><span className="continent asia" /><span className="continent oceania" /></div>{regions.map((region) => <button className="region-pin" style={{ left: region.x, top: region.y }} key={region.country}><span>{region.count}</span>{region.country}</button>)}<p className="map-note">点亮过的产区，会留在你的地图上。</p></section>;
+  const countryRegions: Record<string, string[]> = {
+    法国: ["香槟", "卢瓦尔河谷", "勃艮第", "波尔多", "罗讷河谷"],
+    意大利: ["皮埃蒙特", "威尼托", "托斯卡纳", "西西里"],
+    中国: ["宁夏贺兰山东麓", "新疆", "山东蓬莱", "云南香格里拉"],
+    美国: ["纳帕谷", "索诺玛", "威拉米特谷"],
+    澳大利亚: ["巴罗萨谷", "雅拉谷", "玛格丽特河"],
+    新西兰: ["马尔堡", "中奥塔哥", "霍克斯湾"],
+  };
+  if (selectedCountry) return <section className="region-map region-map-zoomed" aria-label={`${selectedCountry}葡萄酒产区地图`}><header className="region-zoom-header"><button onClick={() => setSelectedCountry(null)} aria-label="返回世界地图"><ArrowLeftIcon /></button><div><strong>{selectedCountry} · 产区地图</strong><small>你点亮过的具体产区</small></div></header><div className="region-zoom-canvas">{countryRegions[selectedCountry].map((region, index) => <button className={`region-node region-node-${index + 1}`} key={region}><span>{index + 1}</span><strong>{region}</strong><small>{index < 2 ? "已点亮" : "待继续探索"}</small></button>)}</div><p className="map-note">点按左上角，回到世界地图。</p></section>;
+  return <section className="region-map" aria-label="世界葡萄酒产区地图"><div className="map-heading"><GlobeIcon /><span>我的葡萄酒足迹</span></div><div className="world-shape" aria-hidden="true"><span className="continent americas" /><span className="continent europe" /><span className="continent asia" /><span className="continent oceania" /></div>{regions.map((region) => <button className="region-pin" style={{ left: region.x, top: region.y }} key={region.country} onClick={() => setSelectedCountry(region.country)}><span>{region.count}</span>{region.country}</button>)}<p className="map-note">点按国家，放大查看具体产区。</p></section>;
 }
 
 function ConfirmScreen({ onBack, onNext }: { onBack: () => void; onNext: () => void }) {
