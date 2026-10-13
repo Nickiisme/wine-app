@@ -6,17 +6,18 @@ import "./locked-overrides.css";
 type Screen = "explore" | "confirm" | "taste" | "success" | "profile";
 type ExploreTab = "grapes" | "regions";
 type GrapeNode = { name: string; english: string; image: string; side: "left" | "right"; recent?: boolean; locked?: boolean };
+const asset = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, "")}`;
 
 const grapeNodes: GrapeNode[] = [
-  { name: "赤霞珠", english: "Cabernet Sauvignon", image: "/assets/grapes/cabernet.png", side: "left" },
-  { name: "梅洛", english: "Merlot", image: "/assets/grapes/merlot.png", side: "right" },
-  { name: "黑皮诺", english: "Pinot Noir", image: "/assets/grapes/pinot-noir.png", side: "left", recent: true },
-  { name: "霞多丽", english: "Chardonnay", image: "/assets/grapes/chardonnay.png", side: "right" },
-  { name: "长相思", english: "Sauvignon Blanc", image: "/assets/grapes/sauvignon-blanc.png", side: "left" },
-  { name: "雷司令", english: "Riesling", image: "/assets/grapes/riesling.png", side: "right", locked: true },
-  { name: "西拉", english: "Syrah", image: "/assets/grapes/riesling.png", side: "left", locked: true },
-  { name: "歌海娜", english: "Grenache", image: "/assets/grapes/riesling.png", side: "right", locked: true },
-  { name: "桑娇维塞", english: "Sangiovese", image: "/assets/grapes/riesling.png", side: "left", locked: true },
+  { name: "赤霞珠", english: "Cabernet Sauvignon", image: asset("assets/grapes/cabernet.png"), side: "left" },
+  { name: "梅洛", english: "Merlot", image: asset("assets/grapes/merlot.png"), side: "right" },
+  { name: "黑皮诺", english: "Pinot Noir", image: asset("assets/grapes/pinot-noir.png"), side: "left", recent: true },
+  { name: "霞多丽", english: "Chardonnay", image: asset("assets/grapes/chardonnay.png"), side: "right" },
+  { name: "长相思", english: "Sauvignon Blanc", image: asset("assets/grapes/sauvignon-blanc.png"), side: "left" },
+  { name: "雷司令", english: "Riesling", image: asset("assets/grapes/riesling.png"), side: "right", locked: true },
+  { name: "西拉", english: "Syrah", image: asset("assets/grapes/riesling.png"), side: "left", locked: true },
+  { name: "歌海娜", english: "Grenache", image: asset("assets/grapes/riesling.png"), side: "right", locked: true },
+  { name: "桑娇维塞", english: "Sangiovese", image: asset("assets/grapes/riesling.png"), side: "left", locked: true },
 ];
 const flavors = ["草莓", "樱桃", "花香", "香草", "香料", "烟熏"];
 
@@ -84,7 +85,7 @@ function TasteScreen({ liked, setLiked, selectedFlavors, toggleFlavor, onBack, o
   return <MobileScroll className="app-scroll paper-screen"><main className="flow-content taste-content"><FlowHeader title="你的感受" onBack={onBack} /><section className="question-block"><h2>你喜欢这杯酒吗？</h2><div className="choice-row">{["不喜欢", "还不错", "喜欢"].map((option) => <button className={liked === option ? "selected" : ""} onClick={() => setLiked(option)} key={option}>{option}</button>)}</div></section><section className="question-block"><h2>喝起来更接近？</h2><div className="range-copy"><span>清爽</span><span>浓郁</span></div><input className="taste-range" type="range" min="0" max="100" defaultValue="58" aria-label="清爽到浓郁" /></section><section className="question-block"><h2>你感受到了什么？</h2><div className="flavor-grid">{flavors.map((flavor) => <button className={selectedFlavors.includes(flavor) ? "selected" : ""} onClick={() => toggleFlavor(flavor)} key={flavor}>{flavor}</button>)}</div></section><section className="question-block note-block"><h2>想记下什么？ <span>选填</span></h2><KeyboardTextarea placeholder="今天和朋友一起喝，第一口有淡淡的草莓香……" /></section><button className="primary-action" onClick={onSave}>保存记录</button></main></MobileScroll>;
 }
 
-function SuccessScreen({ onDone }: { onDone: () => void }) { return <MobileScroll className="app-scroll paper-screen"><main className="success-content"><span className="success-kicker">已点亮新品种</span><img className="success-grape" src="/assets/grapes/pinot-noir.png" alt="黑皮诺葡萄插画" draggable={false} /><h1>黑皮诺</h1><p>Pinot Noir</p><div className="unlock-summary"><CheckIcon /><span>这次品鉴已经加入你的葡萄酒世界</span></div><button className="primary-action" onClick={onDone}>回到我的图鉴</button><button className="text-action" onClick={onDone}>查看这次记录</button></main></MobileScroll>; }
+function SuccessScreen({ onDone }: { onDone: () => void }) { return <MobileScroll className="app-scroll paper-screen"><main className="success-content"><span className="success-kicker">已点亮新品种</span><img className="success-grape" src={asset("assets/grapes/pinot-noir.png")} alt="黑皮诺葡萄插画" draggable={false} /><h1>黑皮诺</h1><p>Pinot Noir</p><div className="unlock-summary"><CheckIcon /><span>这次品鉴已经加入你的葡萄酒世界</span></div><button className="primary-action" onClick={onDone}>回到我的图鉴</button><button className="text-action" onClick={onDone}>查看这次记录</button></main></MobileScroll>; }
 
 function ProfileScreen({ onExplore, onRecord }: { onExplore: () => void; onRecord: () => void }) {
   useEffect(() => {
@@ -95,9 +96,9 @@ function ProfileScreen({ onExplore, onRecord }: { onExplore: () => void; onRecor
     return () => window.clearTimeout(resetScroll);
   }, []);
   const badges = [
-    { name: "葡萄酒初见", note: "旅程徽章", image: "/assets/grapes/cabernet.png", tone: "wine" },
-    { name: "黑皮诺旅行家", note: "组合徽章", image: "/assets/grapes/pinot-noir.png", tone: "plum" },
-    { name: "风味发现者", note: "成长徽章", image: "/assets/grapes/chardonnay.png", tone: "sage" },
+    { name: "葡萄酒初见", note: "旅程徽章", image: asset("assets/grapes/cabernet.png"), tone: "wine" },
+    { name: "黑皮诺旅行家", note: "组合徽章", image: asset("assets/grapes/pinot-noir.png"), tone: "plum" },
+    { name: "风味发现者", note: "成长徽章", image: asset("assets/grapes/chardonnay.png"), tone: "sage" },
   ];
   return <><MobileScroll className="app-scroll paper-screen"><main className="profile-content"><p className="eyebrow">我的</p><div className="profile-head"><span>N</span><div><h1>Nicki</h1><p>12 个品种 · 8 个产区 · 23 次品鉴</p></div></div><section className="badge-section"><div className="section-title"><h2>我的徽章</h2><button>全部 <span>›</span></button></div><div className="badge-row">{badges.map((badge) => <button className={`badge-item ${badge.tone}`} key={badge.name}><span className="badge-visual"><img src={badge.image} alt="" draggable={false} /></span><strong>{badge.name}</strong><small>{badge.note}</small></button>)}</div></section><section className="footprint-section"><div className="section-title"><h2>我的足迹</h2></div><div className="footprint-row"><button><strong>23</strong><span>品鉴记录</span></button><button><strong>12</strong><span>葡萄品种</span></button><button><strong>8</strong><span>探索产区</span></button></div></section><div className="profile-menu">{["我的品鉴记录", "我的风味偏好", "分享我的图鉴", "设置"].map((item) => <button key={item}>{item}<span>›</span></button>)}</div></main></MobileScroll><BottomNav active="profile" onExplore={onExplore} onRecord={onRecord} onProfile={() => {}} /></>;
 }
