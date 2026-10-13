@@ -447,6 +447,51 @@
 .region-map .region-pin { z-index: 3; white-space: nowrap; }
 .region-map:not(.region-map-zoomed) { min-height: 470px; }
 
+.region-page .mobile-scroll { overflow-y: hidden; }
+.region-page .mobile-scroll-content { transform: none !important; }
+.region-page .mobile-scrollbar { display: none; }
+
+.wine-app .region-explore-content {
+  box-sizing: border-box;
+  height: 100dvh;
+  min-height: 0;
+  padding-bottom: 82px;
+  overflow: hidden;
+}
+
+.region-explore-content .region-map,
+.region-explore-content .region-map.region-map-zoomed {
+  height: clamp(260px, calc(100dvh - 301px), 560px);
+  min-height: 0;
+}
+
+.region-explore-content .region-map-zoomed .region-zoom-canvas {
+  inset: 224px 16px 48px;
+  padding: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  align-content: center;
+}
+
+.region-explore-content .region-map-zoomed .region-node {
+  position: relative;
+  inset: auto;
+  width: auto;
+  min-height: 34px;
+  padding: 5px 7px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.region-explore-content .region-map-zoomed .region-node > span { width: 18px; height: 18px; flex: 0 0 auto; font-size: 8px; }
+.region-explore-content .region-map-zoomed .region-node strong { font-size: 10px; }
+.region-explore-content .region-map-zoomed .region-node small { display: none; }
+.region-explore-content .region-map-zoomed .map-note { bottom: 14px; }
+
 .records-content { padding-bottom: 74px; }
 .records-summary { margin: -5px 3px 14px; color: #81756e; font-size: 11px; }
 
