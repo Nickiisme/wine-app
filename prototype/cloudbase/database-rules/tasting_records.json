@@ -1,0 +1,6 @@
+{
+  "read": "doc._openid == auth.uid",
+  "create": "request.data.userId == auth.uid",
+  "update": "doc._openid == auth.uid && request.data.userId == auth.uid",
+  "delete": "doc._openid == auth.uid"
+}

@@ -54,16 +54,18 @@ export default function Prototype() {
 
   useEffect(() => {
     let active = true;
-    listTastingRecords()
-      .then((cloudRecords) => {
-        if (!active) return;
-        setRecords(cloudRecords.length > 0 ? cloudRecords : demoRecords);
-        setCloudMessage(null);
-      })
-      .catch(() => {
-        if (active) setCloudMessage("云端尚未就绪，当前显示演示记录");
-      });
-    return () => { active = false; };
+    const timer = window.setTimeout(() => {
+      listTastingRecords()
+        .then((cloudRecords) => {
+          if (!active) return;
+          setRecords(cloudRecords.length > 0 ? cloudRecords : demoRecords);
+          setCloudMessage(null);
+        })
+        .catch(() => {
+          if (active) setCloudMessage("云端尚未就绪，当前显示演示记录");
+        });
+    }, 700);
+    return () => { active = false; window.clearTimeout(timer); };
   }, []);
 
   const saveTasting = async () => {
