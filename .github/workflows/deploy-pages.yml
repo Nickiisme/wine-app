@@ -29,20 +29,21 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: prototype/package-lock.json
+
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@11.25.0 --activate
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Verify mobile runtime
-        run: npm run check:runtime
+        run: pnpm run check:runtime
 
       - name: Type-check
-        run: npx --no-install tsc
+        run: pnpm exec tsc --noEmit
 
       - name: Build GitHub Pages site
-        run: npx --no-install vite build --base=/wine-app/
+        run: pnpm exec vite build --base=/wine-app/
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
