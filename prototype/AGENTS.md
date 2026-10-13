@@ -2,6 +2,15 @@
 
 ## Prototype Instructions
 
+### Wine Explorer Product Decisions
+
+- The home screen is an immersive, vertically scrolling grape atlas rather than a dashboard or task list.
+- Use warm ivory paper, wine red, muted sage, generous whitespace, and small botanical grape illustrations.
+- Unlocked varieties each use a distinct, botanically differentiated illustration. Locked varieties all use one generic muted grape treatment while clearly showing the varietal name and `待探索` state.
+- Unlocking is immediate and restrained: update the node and show a short confirmation, without growth, fill, or elaborate reveal animation.
+- Keep bottom navigation to Explore, a central record action, and Profile. Explore switches between the grape atlas and region map.
+- Do not use progress bars, percentages, streaks, checklists, lessons, coins, rankings, or persistent task cards.
+
 In ChatGPT Work Mode, run `sites-preview start "$PWD"`, open `http://terminal.local:4173/` in the cloud browser, and verify the rendered app and its primary interactions. Keep that preview open and tell the user to inspect it in the cloud browser; do not present the local URL as a user-facing chat link. In Codex Desktop, run the local server yourself, open the preview in the in-app browser, and provide the clickable local URL. Do not deploy to Sites unless the user explicitly asks to share, publish, or deploy. Do not give the user server-start instructions when you can run it.
 
 Before planning or implementing any mobile-app change, read this `AGENTS.md` in full. It is the source of truth for the template's runtime and component guidance.

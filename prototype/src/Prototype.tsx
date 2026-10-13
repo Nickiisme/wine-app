@@ -1,201 +1,107 @@
-import { useMemo, useState } from "react";
-import { ArchiveIcon, BackpackIcon, BarChartIcon, BellIcon, ChatBubbleIcon, CheckCircledIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, CubeIcon, DashboardIcon, GearIcon, HeartIcon, HomeIcon, IdCardIcon, PersonIcon, PlusIcon, QuestionMarkCircledIcon, ReaderIcon, ReloadIcon, SewingPinFilledIcon, SewingPinIcon, StarIcon } from "@radix-ui/react-icons";
-import { MobileScroll } from "./mobile";
+import { useEffect, useState, type ReactNode } from "react";
+import { ArrowLeftIcon, CameraIcon, CheckIcon, GlobeIcon, ImageIcon, Pencil2Icon, PersonIcon, PlusIcon } from "@radix-ui/react-icons";
+import { BottomSheet, KeyboardInput, KeyboardTextarea, MobileScroll, useKeyboard } from "./mobile";
+import "./locked-overrides.css";
 
-type Occasion = "steak" | "party" | "solo";
+type Screen = "explore" | "confirm" | "taste" | "success" | "profile";
+type ExploreTab = "grapes" | "regions";
+type GrapeNode = { name: string; english: string; image: string; side: "left" | "right"; recent?: boolean; locked?: boolean };
 
-const wineAsset = (file: string) => `${import.meta.env.BASE_URL}assets/wine/${file}`;
-
-const occasions: Array<{ id: Occasion; title: string; subtitle: string; image: string }> = [
-  { id: "steak", title: "今晚牛排", subtitle: "经典搭配", image: wineAsset("hero-steak-wine.png") },
-  { id: "party", title: "周末聚会", subtitle: "多人分享", image: wineAsset("red-bordeaux.png") },
-  { id: "solo", title: "一个人小酌", subtitle: "放松时刻", image: wineAsset("white-sauvignon.png") },
+const grapeNodes: GrapeNode[] = [
+  { name: "赤霞珠", english: "Cabernet Sauvignon", image: "/assets/grapes/cabernet.png", side: "left" },
+  { name: "梅洛", english: "Merlot", image: "/assets/grapes/merlot.png", side: "right" },
+  { name: "黑皮诺", english: "Pinot Noir", image: "/assets/grapes/pinot-noir.png", side: "left", recent: true },
+  { name: "霞多丽", english: "Chardonnay", image: "/assets/grapes/chardonnay.png", side: "right" },
+  { name: "长相思", english: "Sauvignon Blanc", image: "/assets/grapes/sauvignon-blanc.png", side: "left" },
+  { name: "雷司令", english: "Riesling", image: "/assets/grapes/riesling.png", side: "right", locked: true },
+  { name: "西拉", english: "Syrah", image: "/assets/grapes/riesling.png", side: "left", locked: true },
+  { name: "歌海娜", english: "Grenache", image: "/assets/grapes/riesling.png", side: "right", locked: true },
+  { name: "桑娇维塞", english: "Sangiovese", image: "/assets/grapes/riesling.png", side: "left", locked: true },
 ];
-
-const recommendations = {
-  steak: { eyebrow: "SOMMELIER PICKS", title: "为你推荐 · 今晚牛排的理想搭配", subtitle: "基于附近真实库存 · 由专业侍酒师精选" },
-  party: { eyebrow: "WEEKEND SHARING", title: "周末聚会 · 好喝也好分享", subtitle: "本地酒商现货 · 明日送到聚会桌上" },
-  solo: { eyebrow: "A QUIET GLASS", title: "一个人小酌 · 松弛但不将就", subtitle: "小份量也值得认真挑选 · 附近酒商精选" },
-};
-
-const wines = [
-  { id: "lynch-bages", badge: "经典之选", name: "靓茨伯庄园 2020", origin: "法国  波雅克 · 1855 五级庄", notes: "黑加仑 ｜ 黑樱桃 ｜ 雪松 ｜ 单宁细腻", quote: "结构扎实，与牛排的鲜味相得益彰。", price: 899, original: "¥1,180", distance: "杭州·西湖 3.2km", image: wineAsset("red-bordeaux.png") },
-  { id: "cloudy-bay", badge: "人气推荐", name: "云雾之湾 长相思 2024", origin: "新西兰  马尔堡", notes: "柑橘 ｜ 百香果 ｜ 青苹果 ｜ 清新爽脆", quote: "充满活力的果香，平衡油脂感。", price: 249, original: "¥320", distance: "杭州·西湖 2.6km", image: wineAsset("white-sauvignon.png") },
-];
-
-type OrdersScreenProps = { onRepeat: () => void; onNotice: (message: string) => void };
-
-function OrdersScreen({ onRepeat, onNotice }: OrdersScreenProps) {
-  const [filter, setFilter] = useState("all");
-  return (
-    <main className="sub-screen orders-screen" aria-label="我的订单">
-      <header className="sub-header"><p>MY ORDERS</p><h1>我的订单</h1><button type="button" onClick={() => onNotice("没有新的系统消息")}><ChatBubbleIcon /></button></header>
-      <div className="order-tabs" role="tablist" aria-label="订单筛选">
-        {[{id:"all",label:"全部"},{id:"delivery",label:"配送中"},{id:"done",label:"已完成"},{id:"refund",label:"退款/售后"}].map((item) => <button type="button" role="tab" aria-selected={filter===item.id} className={filter===item.id?"active":""} onClick={() => setFilter(item.id)} key={item.id}>{item.label}</button>)}
-      </div>
-
-      {(filter === "all" || filter === "delivery") && <section className="active-order">
-        <div className="order-heading"><span><ClockIcon /> 配送中</span><small>预计明天 14:00 前送达</small></div>
-        <div className="delivery-progress" aria-label="配送进度">
-          <div className="progress-line"><i className="done" /><i className="done" /><i /></div>
-          <div className="progress-labels"><span>商家已接单<small>10月12日 18:24</small></span><span>待骑手取货<small>杭州·西湖仓</small></span><span>送达<small>明天</small></span></div>
-        </div>
-        <div className="order-product"><img src={wineAsset("red-bordeaux.png")} alt="靓茨伯庄园 2020" /><div><h2>靓茨伯庄园 2020</h2><p>法国·波雅克 · 750ml × 1</p><span>正品保障 · 恒温配送</span></div><strong>¥899</strong></div>
-        <div className="order-meta"><span>订单号 202610120038</span><b>实付 ¥899</b></div>
-        <div className="order-actions"><button type="button" onClick={() => onNotice("已为你联系配送骑手")}>联系配送</button><button type="button" className="primary" onClick={() => onNotice("配送轨迹已更新")}>查看物流</button></div>
-      </section>}
-
-      {(filter === "all" || filter === "done") && <section className="past-orders">
-        <div className="list-title"><div><p>PAST ORDERS</p><h2>最近购买</h2></div><button type="button">查看全部 <ChevronRightIcon /></button></div>
-        <article className="past-order"><img src={wineAsset("white-sauvignon.png")} alt="云雾之湾 长相思 2024" /><div><h3>云雾之湾 长相思 2024</h3><p>已于 10月6日送达</p><span>¥249 · 共1件</span></div><button type="button" onClick={onRepeat}><ReloadIcon /> 再来一单</button></article>
-      </section>}
-
-      {filter === "refund" && <section className="empty-state"><ArchiveIcon /><h2>暂无售后记录</h2><p>退款、退货及其他售后进度会显示在这里</p><button type="button" onClick={() => setFilter("all")}>查看全部订单</button></section>}
-    </main>
-  );
-}
-
-function ProfileScreen({ onNotice, onOpenSupplier }: { onNotice: (message: string) => void; onOpenSupplier: () => void }) {
-  const quick = [
-    { icon: <HeartIcon />, label: "我的收藏", value: "12" },
-    { icon: <StarIcon />, label: "优惠券", value: "3张" },
-    { icon: <SewingPinIcon />, label: "收货地址", value: "2个" },
-  ];
-  const services = [
-    { icon: <IdCardIcon />, label: "实名认证", note: "已认证" },
-    { icon: <ChatBubbleIcon />, label: "在线客服", note: "09:00–22:00" },
-    { icon: <ReaderIcon />, label: "饮酒偏好", note: "赤霞珠 · 干型" },
-    { icon: <QuestionMarkCircledIcon />, label: "帮助与反馈", note: "" },
-    { icon: <GearIcon />, label: "设置", note: "" },
-  ];
-  return (
-    <main className="sub-screen profile-screen" aria-label="我的账户">
-      <section className="profile-hero">
-        <p>MY CELLAR</p><div className="profile-title"><span className="avatar"><PersonIcon /></span><div><h1>晚上好，林小姐</h1><small>杭州·西湖 · 品鉴会员</small></div><button type="button" onClick={() => onNotice("个人资料功能即将开放")}><ChevronRightIcon /></button></div>
-        <div className="member-card"><div><span>NEIGHBORHOOD SOMMELIER</span><h2>品鉴会员 · SILVER</h2><p>再消费 ¥352 升级金樽会员</p></div><strong>680<small>酒滴</small></strong></div>
-      </section>
-      <section className="quick-links">{quick.map((item) => <button type="button" key={item.label} onClick={() => onNotice(`${item.label}功能已打开`)}>{item.icon}<strong>{item.value}</strong><span>{item.label}</span></button>)}</section>
-      <section className="profile-section"><div className="list-title"><div><p>PERSONAL SERVICE</p><h2>账户与服务</h2></div></div><div className="service-list">{services.map((item) => <button type="button" key={item.label} onClick={() => onNotice(`${item.label}功能已打开`)}><span className="service-icon">{item.icon}</span><b>{item.label}</b><small>{item.note}</small><ChevronRightIcon /></button>)}</div></section>
-      <section className="supplier-entry"><div><p>FOR LOCAL SUPPLIERS</p><h2>我是城市酒商</h2><span>缴纳保证金，审核后即可发布本地现货</span></div><button type="button" onClick={onOpenSupplier}>进入酒商端 <ChevronRightIcon /></button></section>
-      <p className="responsible-drinking">理性饮酒 · 未成年人请勿饮酒</p>
-    </main>
-  );
-}
-
-function SupplierScreen({ onBack, onNotice }: { onBack: () => void; onNotice: (message: string) => void }) {
-  const actions = [
-    { icon: <PlusIcon />, title: "发布商品", note: "新增本地现货" },
-    { icon: <BackpackIcon />, title: "订单管理", note: "3单待处理" },
-    { icon: <BarChartIcon />, title: "清仓专区", note: "2款进行中" },
-    { icon: <GearIcon />, title: "店铺设置", note: "营业中" },
-  ];
-  return (
-    <main className="supplier-screen" aria-label="城市酒商工作台">
-      <header className="supplier-header">
-        <button type="button" aria-label="返回我的" onClick={onBack}><ChevronLeftIcon /></button>
-        <div><p>CITY WINE MERCHANT</p><h1>城市酒商工作台</h1></div>
-        <button type="button" aria-label="商家通知" onClick={() => onNotice("暂无新的商家通知")}><BellIcon /></button>
-      </header>
-      <section className="merchant-card">
-        <div className="merchant-brand"><span>西湖仓</span><div><h2>栖霞葡萄酒商行</h2><p>杭州·西湖 · 距消费者 3.2km</p></div></div>
-        <span className="merchant-verified"><CheckCircledIcon /> 平台认证酒商</span>
-        <div className="merchant-meta"><span>保证金状态<small>¥10,000 · 已缴纳</small></span><span>履约评分<small>4.9 / 5.0</small></span><span>营业状态<small>营业中</small></span></div>
-      </section>
-      <section className="merchant-kpis">
-        <div><span>今日成交</span><strong>¥ 6,328</strong><small>较昨日 +12.6%</small></div>
-        <div><span>待发货</span><strong>3<small>单</small></strong><small>最早 16:30 前</small></div>
-        <div><span>可售库存</span><strong>286<small>瓶</small></strong><small>低库存 2 款</small></div>
-        <div><span>待结算</span><strong>¥ 8,920</strong><small>10月15日到账</small></div>
-      </section>
-      <section className="merchant-actions">
-        <div className="merchant-section-title"><div><p>QUICK ACTIONS</p><h2>常用功能</h2></div></div>
-        <div className="action-grid">{actions.map((item) => <button type="button" key={item.title} onClick={() => onNotice(`${item.title}已打开`)}><span>{item.icon}</span><b>{item.title}</b><small>{item.note}</small></button>)}</div>
-      </section>
-      <section className="merchant-panel">
-        <div className="merchant-section-title"><div><p>FULFILLMENT</p><h2>待处理订单</h2></div><button type="button" onClick={() => onNotice("订单管理已打开")}>全部订单 <ChevronRightIcon /></button></div>
-        <article className="merchant-order"><img src={wineAsset("red-bordeaux.png")} alt="靓茨伯庄园 2020" /><div><span>明日达 · 需16:30前出库</span><h3>靓茨伯庄园 2020 × 1</h3><p>订单尾号 0038 · 上海路配送点</p></div><button type="button" onClick={() => onNotice("订单已进入备货流程")}>开始备货</button></article>
-        <article className="merchant-order"><img src={wineAsset("white-sauvignon.png")} alt="云雾之湾 长相思 2024" /><div><span>后日达 · 需今日出库</span><h3>云雾之湾 长相思 2024 × 2</h3><p>订单尾号 0041 · 文三路配送点</p></div><button type="button" onClick={() => onNotice("订单已进入备货流程")}>开始备货</button></article>
-      </section>
-      <section className="stock-alert">
-        <div className="merchant-section-title"><div><p>INVENTORY ALERT</p><h2>库存提醒</h2></div><button type="button" onClick={() => onNotice("库存管理已打开")}>管理库存 <ChevronRightIcon /></button></div>
-        <div className="stock-row"><img src={wineAsset("red-bordeaux.png")} alt="奔富 BIN 389" /><div><h3>奔富 BIN 389</h3><p>杭州仓 · 剩余 6 瓶</p></div><span>建议清仓</span></div>
-      </section>
-      <button className="supplier-primary" type="button" onClick={() => onNotice("发布商品表单已打开")}><PlusIcon /> 发布本地现货</button>
-    </main>
-  );
-}
+const flavors = ["草莓", "樱桃", "花香", "香草", "香料", "烟熏"];
 
 export default function Prototype() {
-  const [occasion, setOccasion] = useState<Occasion>("steak");
-  const [cart, setCart] = useState<string[]>([]);
-  const [tab, setTab] = useState("home");
-  const [notice, setNotice] = useState("");
-  const copy = recommendations[occasion];
-  const cartCount = useMemo(() => cart.length, [cart]);
-
-  const addToCart = (id: string, name: string) => {
-    setCart((current) => [...current, id]);
-    setNotice(`${name} 已加入购物车`);
-    window.setTimeout(() => setNotice(""), 1800);
-  };
-
-  const jumpToRecommendations = () => document.querySelector(".recommendations")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const keyboard = useKeyboard();
+  const [screen, setScreen] = useState<Screen>("explore");
+  const [tab, setTab] = useState<ExploreTab>("grapes");
+  const [recordSheet, setRecordSheet] = useState(false);
+  const [liked, setLiked] = useState("喜欢");
+  const [selectedFlavors, setSelectedFlavors] = useState<string[]>(["草莓", "花香"]);
+  const go = (next: Screen) => { keyboard.hide(); setScreen(next); };
+  const startRecord = () => { setRecordSheet(false); go("confirm"); };
 
   return (
-    <div className="wine-app-shell">
-      <MobileScroll className="app-screen" key={tab}>
-        {tab === "home" || tab === "wine" ? <main className="wine-home" aria-label="身边酒窖消费者首页">
-          <section className="hero" aria-label="今晚牛排配酒推荐">
-            <img className="hero-image" src={wineAsset("hero-steak-wine.png")} alt="牛排、红酒杯与葡萄酒瓶" />
-            <div className="hero-content">
-              <button className="location-button" type="button" aria-label="切换配送位置"><SewingPinFilledIcon /><span>杭州·西湖</span><ChevronDownIcon /></button>
-              <p className="delivery-note">附近优质酒庄 · 专注正品 · 明日达</p>
-              <p className="hero-kicker">NEIGHBORHOOD SOMMELIER</p>
-              <h1>今晚牛排<br />就喝这一瓶</h1>
-              <p className="hero-subtitle">附近酒商精选 · 正品现货 · 明日达</p>
-              <button className="hero-cta" type="button" onClick={jumpToRecommendations}>查看推荐 <ChevronRightIcon /></button>
-            </div>
-          </section>
-
-          <div className="occasion-rail" role="tablist" aria-label="选择饮酒场景">
-            {occasions.map((item) => (
-              <button key={item.id} type="button" role="tab" aria-selected={occasion === item.id} className={`occasion ${occasion === item.id ? "is-active" : ""}`} onClick={() => setOccasion(item.id)}>
-                <img src={item.image} alt="" /><span><strong>{item.title}</strong><small>{item.subtitle}</small></span>
-              </button>
-            ))}
-          </div>
-
-          <section className="recommendations">
-            <header className="section-header">
-              <div><p>{copy.eyebrow}</p><h2>{copy.title}</h2><span>{copy.subtitle}</span></div>
-              <button type="button" className="text-link">查看更多 <ChevronRightIcon /></button>
-            </header>
-            <div className="wine-list">
-              {wines.map((wine) => (
-                <article className="wine-row" key={wine.id}>
-                  <img className="wine-image" src={wine.image} alt={`${wine.name}葡萄酒`} />
-                  <div className="wine-copy">
-                    <div className="wine-topline"><span className="wine-badge">{wine.badge}</span><span className="verified"><CheckCircledIcon /> 附近认证酒商</span></div>
-                    <h3>{wine.name}</h3><p className="origin">{wine.origin}</p><p className="notes">{wine.notes}</p>
-                    <p className="quote">“{wine.quote}”<br /><span>—— 附近合作侍酒师</span></p>
-                    <div className="purchase-line"><div><strong>¥ {wine.price}</strong><del>{wine.original}</del></div><div className="eta"><b>明日达</b><small>{wine.distance}</small></div></div>
-                    <button className="cart-button" type="button" onClick={() => addToCart(wine.id, wine.name)}>加入购物车</button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <section className="brand-banner" aria-label="品牌主张"><img src={wineAsset("hero-steak-wine.png")} alt="葡萄酒生活场景" /><div><p>身边的好酒&nbsp;&nbsp;更近的生活</p><small>NEIGHBORHOOD SOMMELIER</small></div></section>
-        </main> : tab === "orders" ? <OrdersScreen onRepeat={() => addToCart("cloudy-bay", "云雾之湾 长相思 2024")} onNotice={setNotice} /> : tab === "supplier" ? <SupplierScreen onBack={() => setTab("profile")} onNotice={setNotice} /> : <ProfileScreen onNotice={setNotice} onOpenSupplier={() => setTab("supplier")} />}
-      </MobileScroll>
-      {tab !== "supplier" && <nav className="bottom-nav" aria-label="主导航">
-        <button className={tab === "home" ? "active" : ""} onClick={() => setTab("home")}><HomeIcon /><span>首页</span></button>
-        <button className={tab === "wine" ? "active" : ""} onClick={() => setTab("wine")}><BackpackIcon /><span>选酒</span></button>
-        <button className={tab === "orders" ? "active" : ""} onClick={() => setTab("orders")}><BackpackIcon /><span>订单</span>{cartCount > 0 && <i>{cartCount}</i>}</button>
-        <button className={tab === "profile" ? "active" : ""} onClick={() => setTab("profile")}><PersonIcon /><span>我的</span></button>
-      </nav>}
-      {notice && <div className="toast" role="status"><CheckCircledIcon /> {notice}</div>}
+    <div className="wine-app">
+      {screen === "explore" && <ExploreScreen tab={tab} onTab={setTab} onRecord={() => setRecordSheet(true)} onProfile={() => go("profile")} />}
+      {screen === "confirm" && <ConfirmScreen onBack={() => go("explore")} onNext={() => go("taste")} />}
+      {screen === "taste" && <TasteScreen liked={liked} setLiked={setLiked} selectedFlavors={selectedFlavors} toggleFlavor={(flavor) => setSelectedFlavors((current) => current.includes(flavor) ? current.filter((item) => item !== flavor) : [...current, flavor])} onBack={() => go("confirm")} onSave={() => go("success")} />}
+      {screen === "success" && <SuccessScreen onDone={() => go("explore")} />}
+      {screen === "profile" && <ProfileScreen onExplore={() => go("explore")} onRecord={() => setRecordSheet(true)} />}
+      <BottomSheet open={recordSheet} onOpenChange={setRecordSheet} title="记录一杯" description="选择一种最方便的方式开始" snap={0.42}>
+        <div className="record-options">
+          <RecordOption icon={<CameraIcon />} title="拍摄酒标" detail="自动识别酒款信息" primary onClick={startRecord} />
+          <RecordOption icon={<ImageIcon />} title="从相册选择" detail="使用已有的酒标照片" onClick={startRecord} />
+          <RecordOption icon={<Pencil2Icon />} title="手动记录" detail="没有照片也可以记录" onClick={startRecord} />
+        </div>
+      </BottomSheet>
     </div>
   );
 }
+
+function RecordOption({ icon, title, detail, primary, onClick }: { icon: ReactNode; title: string; detail: string; primary?: boolean; onClick: () => void }) {
+  return <button className={`record-option ${primary ? "primary" : ""}`} onClick={onClick}>{icon}<span><strong>{title}</strong><small>{detail}</small></span></button>;
+}
+
+function ExploreScreen({ tab, onTab, onRecord, onProfile }: { tab: ExploreTab; onTab: (tab: ExploreTab) => void; onRecord: () => void; onProfile: () => void }) {
+  return <>
+    <MobileScroll className="app-scroll paper-screen">
+      <main className="explore-content">
+        <header className="welcome"><p className="eyebrow">晚上好，Nicki</p><h1>你的葡萄酒世界已点亮：</h1><p className="stats"><strong>12</strong> 个品种 <i>·</i> <strong>8</strong> 个产区 <i>·</i> <strong>23</strong> 次品鉴</p></header>
+        <div className="atlas-tabs" role="tablist" aria-label="图鉴视图"><button className={tab === "grapes" ? "active" : ""} onClick={() => onTab("grapes")}>品种图鉴</button><button className={tab === "regions" ? "active" : ""} onClick={() => onTab("regions")}>产区地图</button></div>
+        {tab === "grapes" ? <GrapeAtlas /> : <RegionMap />}
+      </main>
+    </MobileScroll>
+    <BottomNav active="explore" onExplore={() => onTab(tab)} onRecord={onRecord} onProfile={onProfile} />
+  </>;
+}
+
+function GrapeAtlas() {
+  return <section className="grape-atlas" aria-label="葡萄品种探索路径"><div className="path-line" aria-hidden="true" />{grapeNodes.map((grape, index) => <button key={`${grape.name}-${index}`} className={`grape-node ${grape.side} ${grape.locked ? "locked" : ""} ${grape.recent ? "recent" : ""}`} aria-label={`${grape.name}${grape.locked ? "，待探索" : ""}`}><span className="grape-art-wrap"><img src={grape.image} alt="" draggable={false} />{grape.recent && <span className="recent-spark">✦</span>}{grape.locked && <span className="locked-mark">?</span>}</span><strong>{grape.name}</strong><small>{grape.locked ? `${grape.english} · 待探索` : grape.english}</small></button>)}</section>;
+}
+
+function RegionMap() {
+  const regions = [{ country: "法国", count: 5, x: "32%", y: "25%" }, { country: "意大利", count: 2, x: "57%", y: "36%" }, { country: "中国", count: 3, x: "75%", y: "45%" }, { country: "美国", count: 1, x: "17%", y: "43%" }, { country: "澳大利亚", count: 1, x: "77%", y: "73%" }, { country: "新西兰", count: 2, x: "88%", y: "81%" }];
+  return <section className="region-map" aria-label="世界葡萄酒产区地图"><div className="map-heading"><GlobeIcon /><span>我的葡萄酒足迹</span></div><div className="world-shape" aria-hidden="true"><span className="continent americas" /><span className="continent europe" /><span className="continent asia" /><span className="continent oceania" /></div>{regions.map((region) => <button className="region-pin" style={{ left: region.x, top: region.y }} key={region.country}><span>{region.count}</span>{region.country}</button>)}<p className="map-note">点亮过的产区，会留在你的地图上。</p></section>;
+}
+
+function ConfirmScreen({ onBack, onNext }: { onBack: () => void; onNext: () => void }) {
+  return <MobileScroll className="app-scroll paper-screen"><main className="flow-content"><FlowHeader title="确认酒款" onBack={onBack} /><div className="label-photo"><div className="bottle-mark">B</div><div><strong>Bourgogne</strong><span>PINOT NOIR · 2020</span></div><span className="scan-pill"><CheckIcon /> 已识别</span></div><p className="helper-copy">请确认识别结果，点按任意字段即可修改。</p><div className="form-list"><Field label="酒款名称" value="Domaine Belle Rivière" /><Field label="年份" value="2020" /><Field label="葡萄品种" value="黑皮诺" /><Field label="国家" value="法国" /><Field label="产区" value="勃艮第" /></div><button className="primary-action" onClick={onNext}>确认，继续</button></main></MobileScroll>;
+}
+
+function Field({ label, value }: { label: string; value: string }) { return <label className="field-row"><span>{label}</span><KeyboardInput defaultValue={value} aria-label={label} /></label>; }
+
+function TasteScreen({ liked, setLiked, selectedFlavors, toggleFlavor, onBack, onSave }: { liked: string; setLiked: (liked: string) => void; selectedFlavors: string[]; toggleFlavor: (flavor: string) => void; onBack: () => void; onSave: () => void }) {
+  return <MobileScroll className="app-scroll paper-screen"><main className="flow-content taste-content"><FlowHeader title="你的感受" onBack={onBack} /><section className="question-block"><h2>你喜欢这杯酒吗？</h2><div className="choice-row">{["不喜欢", "还不错", "喜欢"].map((option) => <button className={liked === option ? "selected" : ""} onClick={() => setLiked(option)} key={option}>{option}</button>)}</div></section><section className="question-block"><h2>喝起来更接近？</h2><div className="range-copy"><span>清爽</span><span>浓郁</span></div><input className="taste-range" type="range" min="0" max="100" defaultValue="58" aria-label="清爽到浓郁" /></section><section className="question-block"><h2>你感受到了什么？</h2><div className="flavor-grid">{flavors.map((flavor) => <button className={selectedFlavors.includes(flavor) ? "selected" : ""} onClick={() => toggleFlavor(flavor)} key={flavor}>{flavor}</button>)}</div></section><section className="question-block note-block"><h2>想记下什么？ <span>选填</span></h2><KeyboardTextarea placeholder="今天和朋友一起喝，第一口有淡淡的草莓香……" /></section><button className="primary-action" onClick={onSave}>保存记录</button></main></MobileScroll>;
+}
+
+function SuccessScreen({ onDone }: { onDone: () => void }) { return <MobileScroll className="app-scroll paper-screen"><main className="success-content"><span className="success-kicker">已点亮新品种</span><img className="success-grape" src="/assets/grapes/pinot-noir.png" alt="黑皮诺葡萄插画" draggable={false} /><h1>黑皮诺</h1><p>Pinot Noir</p><div className="unlock-summary"><CheckIcon /><span>这次品鉴已经加入你的葡萄酒世界</span></div><button className="primary-action" onClick={onDone}>回到我的图鉴</button><button className="text-action" onClick={onDone}>查看这次记录</button></main></MobileScroll>; }
+
+function ProfileScreen({ onExplore, onRecord }: { onExplore: () => void; onRecord: () => void }) {
+  useEffect(() => {
+    const resetScroll = window.setTimeout(() => {
+      const scroll = document.querySelector<HTMLElement>(".mobile-scroll");
+      if (scroll) scroll.scrollTop = 0;
+    }, 120);
+    return () => window.clearTimeout(resetScroll);
+  }, []);
+  const badges = [
+    { name: "葡萄酒初见", note: "旅程徽章", image: "/assets/grapes/cabernet.png", tone: "wine" },
+    { name: "黑皮诺旅行家", note: "组合徽章", image: "/assets/grapes/pinot-noir.png", tone: "plum" },
+    { name: "风味发现者", note: "成长徽章", image: "/assets/grapes/chardonnay.png", tone: "sage" },
+  ];
+  return <><MobileScroll className="app-scroll paper-screen"><main className="profile-content"><p className="eyebrow">我的</p><div className="profile-head"><span>N</span><div><h1>Nicki</h1><p>12 个品种 · 8 个产区 · 23 次品鉴</p></div></div><section className="badge-section"><div className="section-title"><h2>我的徽章</h2><button>全部 <span>›</span></button></div><div className="badge-row">{badges.map((badge) => <button className={`badge-item ${badge.tone}`} key={badge.name}><span className="badge-visual"><img src={badge.image} alt="" draggable={false} /></span><strong>{badge.name}</strong><small>{badge.note}</small></button>)}</div></section><section className="footprint-section"><div className="section-title"><h2>我的足迹</h2></div><div className="footprint-row"><button><strong>23</strong><span>品鉴记录</span></button><button><strong>12</strong><span>葡萄品种</span></button><button><strong>8</strong><span>探索产区</span></button></div></section><div className="profile-menu">{["我的品鉴记录", "我的风味偏好", "分享我的图鉴", "设置"].map((item) => <button key={item}>{item}<span>›</span></button>)}</div></main></MobileScroll><BottomNav active="profile" onExplore={onExplore} onRecord={onRecord} onProfile={() => {}} /></>;
+}
+
+function FlowHeader({ title, onBack }: { title: string; onBack: () => void }) { return <header className="flow-header"><button onClick={onBack} aria-label="返回"><ArrowLeftIcon /></button><h1>{title}</h1><span /></header>; }
+
+function BottomNav({ active, onExplore, onRecord, onProfile }: { active: "explore" | "profile"; onExplore: () => void; onRecord: () => void; onProfile: () => void }) { return <nav className="bottom-nav" aria-label="主要导航"><button className={active === "explore" ? "active" : ""} onClick={onExplore}><GlobeIcon /><span>探索</span></button><button className="record-button" onClick={onRecord} aria-label="记录一杯"><PlusIcon /></button><button className={active === "profile" ? "active" : ""} onClick={onProfile}><PersonIcon /><span>我的</span></button></nav>; }

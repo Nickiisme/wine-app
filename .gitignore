@@ -1,4 +1,5 @@
 .pnpm-store/
+.DS_Store
 
 # Local visual QA captures
 prototype/*-raw.png
