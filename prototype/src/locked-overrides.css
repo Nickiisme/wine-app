@@ -387,6 +387,21 @@
 .country-facts p { grid-column: 1 / -1; margin: 0; color: #5f534d; font-size: 11px; line-height: 1.5; }
 .country-facts p span { display: block; margin-bottom: 3px; }
 
+.world-map-art {
+  position: absolute;
+  z-index: 1;
+  left: 10px;
+  right: 10px;
+  top: 116px;
+  width: calc(100% - 20px);
+  height: auto;
+  opacity: .58;
+  filter: saturate(.62) contrast(.88);
+}
+
+.region-map .region-pin { z-index: 3; white-space: nowrap; }
+.region-map:not(.region-map-zoomed) { min-height: 470px; }
+
 .records-content { padding-bottom: 74px; }
 .records-summary { margin: -5px 3px 18px; color: #81756e; font-size: 11px; }
 .records-list { display: grid; gap: 12px; }
