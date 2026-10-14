@@ -26,36 +26,41 @@ CREATE POLICY tasting_photos_bucket_read ON storage.buckets
 
 DROP POLICY IF EXISTS tasting_photos_select_own ON storage.objects;
 CREATE POLICY tasting_photos_select_own ON storage.objects
-  FOR SELECT TO authenticated
+  FOR SELECT TO anon, authenticated
   USING (
     bucket_id = 'tasting-photos'
     AND (storage.foldername(name))[1] = auth.uid()
+    AND owner_id = auth.uid()
   );
 
 DROP POLICY IF EXISTS tasting_photos_insert_own ON storage.objects;
 CREATE POLICY tasting_photos_insert_own ON storage.objects
-  FOR INSERT TO authenticated
+  FOR INSERT TO anon, authenticated
   WITH CHECK (
     bucket_id = 'tasting-photos'
     AND (storage.foldername(name))[1] = auth.uid()
+    AND owner_id = auth.uid()
   );
 
 DROP POLICY IF EXISTS tasting_photos_update_own ON storage.objects;
 CREATE POLICY tasting_photos_update_own ON storage.objects
-  FOR UPDATE TO authenticated
+  FOR UPDATE TO anon, authenticated
   USING (
     bucket_id = 'tasting-photos'
     AND (storage.foldername(name))[1] = auth.uid()
+    AND owner_id = auth.uid()
   )
   WITH CHECK (
     bucket_id = 'tasting-photos'
     AND (storage.foldername(name))[1] = auth.uid()
+    AND owner_id = auth.uid()
   );
 
 DROP POLICY IF EXISTS tasting_photos_delete_own ON storage.objects;
 CREATE POLICY tasting_photos_delete_own ON storage.objects
-  FOR DELETE TO authenticated
+  FOR DELETE TO anon, authenticated
   USING (
     bucket_id = 'tasting-photos'
     AND (storage.foldername(name))[1] = auth.uid()
+    AND owner_id = auth.uid()
   );

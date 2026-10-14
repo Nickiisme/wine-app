@@ -12,9 +12,12 @@ API Key. It uses CloudBase authentication and PostgreSQL RLS instead.
 3. Under **身份认证 / 邮件配置**, configure the registration verification and password-reset email templates and an allowed redirect URL for the deployed site.
 4. Create the PostgreSQL application tables in the SQL editor.
 5. Run `postgresql-permissions.sql` to grant frontend access and enable RLS.
-6. Under **云存储 / 安全规则**, allow authenticated users to upload and read
-   files in `tasting-records/{uid}/...`. The application stores CloudBase file IDs
-   in PostgreSQL and requests short-lived display URLs when loading the timeline.
+6. Run `postgresql-storage.sql` in the same SQL editor. It creates the private
+   `tasting-photos` bucket and allows both registered and anonymous app users to
+   access only files under their own `{uid}/...` path.
+
+Re-run both SQL files after pulling schema or policy changes. Committing or
+deploying the web client does not apply PostgreSQL RLS policies automatically.
 
 The client signs in anonymously and RLS compares each row's `user_id` with
 `auth.uid()`. Never put a `service_role` API Key in H5 or App code.

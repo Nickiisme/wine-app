@@ -115,7 +115,13 @@ async function uploadPhotos(files: File[], userId: string, recordId: string) {
     const { data, error } = await bucket.upload(objectPath, file, {
       contentType: file.type || undefined,
     });
-    if (error) throw error;
+    if (error) {
+      const message = String(error.message ?? error);
+      if (/row-level security|storage_access_denied|access denied|rls/i.test(message)) {
+        throw new Error("照片存储权限尚未配置：请在 CloudBase SQL 工作台执行 cloudbase/postgresql-storage.sql");
+      }
+      throw error;
+    }
     return data.path;
   }));
 }
