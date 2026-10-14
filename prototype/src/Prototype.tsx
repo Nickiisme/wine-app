@@ -9,7 +9,7 @@ type Screen = "explore" | "confirm" | "taste" | "success" | "profile" | "records
 type ExploreTab = "grapes" | "regions";
 type GrapeNode = { name: string; english: string; image: string; side: "left" | "right"; recent?: boolean; locked?: boolean };
 type GrapeDetail = { intro: string; taste: string; aromas: string[]; regions: string };
-type DraftPhoto = { id: string; preview: string; file: File };
+type DraftPhoto = { id: string; preview: string; file: File; preparedFile: Promise<File> };
 type WineDraft = { wine: string; year: string; grape: string; country: string; region: string; photos: DraftPhoto[] };
 type PickerOption = { value: string; label: string };
 const asset = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, "")}`;
@@ -75,13 +75,49 @@ const regionOptionsByCountry: Record<string, PickerOption[]> = {
 };
 const newDraft = (): WineDraft => ({ wine: "", year: String(new Date().getFullYear()), grape: "黑皮诺", country: "法国", region: "勃艮第", photos: [] });
 
-function previewFile(file: File) {
-  return new Promise<DraftPhoto>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener("load", () => typeof reader.result === "string" ? resolve({ id: crypto.randomUUID(), preview: reader.result, file }) : reject(new Error("无法读取照片")));
-    reader.addEventListener("error", () => reject(reader.error ?? new Error("无法读取照片")));
-    reader.readAsDataURL(file);
+async function optimizePhoto(file: File) {
+  if (!file.type.startsWith("image/")) return file;
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.decoding = "async";
+    await new Promise<void>((resolve, reject) => {
+      image.addEventListener("load", () => resolve(), { once: true });
+      image.addEventListener("error", () => reject(new Error("无法解析照片")), { once: true });
+      image.src = objectUrl;
+    });
+    const maxEdge = 1600;
+    const scale = Math.min(1, maxEdge / Math.max(image.naturalWidth, image.naturalHeight));
+    if (scale === 1 && file.size <= 1_000_000) return file;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const context = canvas.getContext("2d", { alpha: false });
+    if (!context) return file;
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82));
+    if (!blob || blob.size >= file.size) return file;
+    const baseName = file.name.replace(/\.[^.]+$/, "") || "wine-photo";
+    return new File([blob], `${baseName}.jpg`, { type: "image/jpeg", lastModified: file.lastModified });
+  } catch {
+    return file;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+function preparePhotos(files: File[]) {
+  const resolvers: Array<(file: File) => void> = [];
+  const preparedFiles = files.map(() => new Promise<File>((resolve) => resolvers.push(resolve)));
+  let nextIndex = 0;
+  const workers = Array.from({ length: Math.min(3, files.length) }, async () => {
+    while (nextIndex < files.length) {
+      const index = nextIndex++;
+      resolvers[index](await optimizePhoto(files[index]));
+    }
   });
+  void Promise.all(workers);
+  return files.map((file, index) => ({ id: crypto.randomUUID(), preview: URL.createObjectURL(file), file, preparedFile: preparedFiles[index] }));
 }
 
 function keepEditorAboveKeyboard(editor: HTMLElement) {
@@ -127,29 +163,33 @@ export default function Prototype() {
   const noteCameraInput = useRef<HTMLInputElement>(null);
   const noteGalleryInput = useRef<HTMLInputElement>(null);
   const go = (next: Screen) => { keyboard.hide(); setScreen(next); };
-  const resetRecord = () => { setDraft(newDraft()); setTastingNote(""); setLiked("喜欢"); setSelectedFlavors(["草莓", "花香"]); setBodyLevel(58); };
+  const resetRecord = () => { setDraft((current) => { current.photos.forEach((photo) => URL.revokeObjectURL(photo.preview)); return newDraft(); }); setTastingNote(""); setLiked("喜欢"); setSelectedFlavors(["草莓", "花香"]); setBodyLevel(58); };
   const startManualRecord = () => { setRecordSheet(false); resetRecord(); go("confirm"); };
   const openCamera = () => {
     setRecordSheet(true);
     cameraInput.current?.click();
   };
   const openGallery = () => galleryInput.current?.click();
-  const useSelectedPhoto = async (event: ChangeEvent<HTMLInputElement>) => {
+  const useSelectedPhoto = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = "";
     if (!file) return;
-    const photo = await previewFile(file);
+    const photo = preparePhotos([file])[0];
     resetRecord();
     setDraft((current) => ({ ...current, wine: "Domaine Belle Rivière", year: "2020", photos: [photo] }));
     setRecordSheet(false);
     go("confirm");
   };
-  const addNotePhotos = async (event: ChangeEvent<HTMLInputElement>) => {
+  const addNotePhotos = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.currentTarget.files ?? []);
     event.currentTarget.value = "";
     if (files.length === 0) return;
-    const nextPhotos = await Promise.all(files.map(previewFile));
-    setDraft((current) => ({ ...current, photos: [...current.photos, ...nextPhotos].slice(0, 9) }));
+    setDraft((current) => {
+      const availableSlots = Math.max(0, 9 - current.photos.length);
+      if (availableSlots === 0) return current;
+      const nextPhotos = preparePhotos(files.slice(0, availableSlots));
+      return { ...current, photos: [...current.photos, ...nextPhotos] };
+    });
   };
 
   useEffect(() => {
@@ -211,12 +251,13 @@ export default function Prototype() {
         country: draft.country,
         region: [draft.country, draft.region].filter(Boolean).join(" · "),
         note: tastingNote,
-        photoFiles: draft.photos.map((photo) => photo.file),
+        photoFiles: await Promise.all(draft.photos.map((photo) => photo.preparedFile)),
         preference: liked,
         flavors: selectedFlavors,
         bodyLevel,
       });
       setRecords((current) => [saved, ...current]);
+      draft.photos.forEach((photo) => URL.revokeObjectURL(photo.preview));
       go("success");
     } catch (error) {
       console.error("CloudBase tasting record save failed", error);
@@ -231,7 +272,7 @@ export default function Prototype() {
     <div className="wine-app">
       {screen === "explore" && <ExploreScreen tab={tab} records={records} account={account} onTab={setTab} onRecord={openCamera} onProfile={() => go("profile")} onNotes={(grape) => { setRecordFilter(grape); go("records"); }} />}
       {screen === "confirm" && <ConfirmScreen draft={draft} onChange={setDraft} onBack={() => go("explore")} onNext={() => go("taste")} />}
-      {screen === "taste" && <TasteScreen liked={liked} setLiked={setLiked} selectedFlavors={selectedFlavors} toggleFlavor={(flavor) => setSelectedFlavors((current) => current.includes(flavor) ? current.filter((item) => item !== flavor) : [...current, flavor])} note={tastingNote} onNoteChange={setTastingNote} bodyLevel={bodyLevel} onBodyLevel={setBodyLevel} photos={draft.photos} onCamera={() => noteCameraInput.current?.click()} onGallery={() => noteGalleryInput.current?.click()} onRemovePhoto={(id) => setDraft((current) => ({ ...current, photos: current.photos.filter((photo) => photo.id !== id) }))} onBack={() => go("confirm")} onSave={saveTasting} saving={savingRecord} cloudMessage={cloudMessage} />}
+      {screen === "taste" && <TasteScreen liked={liked} setLiked={setLiked} selectedFlavors={selectedFlavors} toggleFlavor={(flavor) => setSelectedFlavors((current) => current.includes(flavor) ? current.filter((item) => item !== flavor) : [...current, flavor])} note={tastingNote} onNoteChange={setTastingNote} bodyLevel={bodyLevel} onBodyLevel={setBodyLevel} photos={draft.photos} onCamera={() => noteCameraInput.current?.click()} onGallery={() => noteGalleryInput.current?.click()} onRemovePhoto={(id) => setDraft((current) => { const removed = current.photos.find((photo) => photo.id === id); if (removed) URL.revokeObjectURL(removed.preview); return { ...current, photos: current.photos.filter((photo) => photo.id !== id) }; })} onBack={() => go("confirm")} onSave={saveTasting} saving={savingRecord} cloudMessage={cloudMessage} />}
       {screen === "success" && <SuccessScreen grape={draft.grape} onDone={() => go("explore")} />}
       {screen === "profile" && <ProfileScreen records={records} account={account} onExplore={() => go("explore")} onRecord={openCamera} onRecords={() => { setRecordFilter(null); go("records"); }} onFlavor={() => go("flavor")} onShare={() => go("share")} onSettings={() => go("settings")} />}
       {screen === "records" && <TastingRecordsScreen grape={recordFilter} records={records} cloudMessage={cloudMessage} onBack={() => go(recordFilter ? "explore" : "profile")} />}
@@ -507,8 +548,10 @@ function AuthScreen({ onBack, onAuthenticated }: { onBack: () => void; onAuthent
 }
 
 function TastingRecordsScreen({ grape, records: allRecords, cloudMessage, onBack }: { grape: string | null; records: TastingRecord[]; cloudMessage: string | null; onBack: () => void }) {
+  const [viewer, setViewer] = useState<{ photos: string[]; index: number; wine: string } | null>(null);
   const records = grape ? allRecords.filter((record) => record.grape === grape) : allRecords;
-  return <MobileScroll className="app-scroll paper-screen"><main className="flow-content records-content"><FlowHeader title={grape ? `${grape}的品酒笔记` : "我的品鉴记录"} onBack={onBack} />{cloudMessage && <p className="records-summary" role="status">{cloudMessage}</p>}<div className="timeline-year"><strong>{new Date().getFullYear()}</strong><span>{grape ? `${records.length} 条${grape}记录` : `共 ${records.length} 次品鉴`}</span></div><div className="records-timeline">{records.map((record, index) => { const date = splitRecordDate(record.date); const photos = record.photos ?? []; return <article className="timeline-record" key={record.id}><time className="timeline-date" dateTime={record.createdAt}><strong>{date.day}</strong><span>{date.month}</span></time><div className="timeline-dot" aria-hidden="true" /><div className="timeline-content"><div className="timeline-meta"><span>{record.grape}</span><small>{record.region}</small></div>{photos.length > 0 && <div className={`timeline-photo-grid count-${Math.min(photos.length, 3)}`}>{photos.slice(0, 9).map((photo, photoIndex) => <div key={photo}><img className="timeline-photo" src={photo} alt={`${record.wine}品鉴照片 ${photoIndex + 1}`} draggable={false} loading={index < 2 ? "eager" : "lazy"} decoding="async" />{photoIndex === 8 && photos.length > 9 && <span>+{photos.length - 9}</span>}</div>)}</div>}<h2>{record.wine}{record.year ? ` · ${record.year}` : ""}</h2><p>{record.note || "这一杯还没有写下品鉴感受。"}</p>{record.flavors && record.flavors.length > 0 && <div className="timeline-flavors">{record.flavors.slice(0, 4).map((flavor) => <span key={flavor}>{flavor}</span>)}</div>}</div></article>; })}</div></main></MobileScroll>;
+  const moveViewer = (direction: number) => setViewer((current) => current ? { ...current, index: (current.index + direction + current.photos.length) % current.photos.length } : null);
+  return <><MobileScroll className="app-scroll paper-screen"><main className="flow-content records-content"><FlowHeader title={grape ? `${grape}的品酒笔记` : "我的品鉴记录"} onBack={onBack} />{cloudMessage && <p className="records-summary" role="status">{cloudMessage}</p>}<div className="timeline-year"><strong>{new Date().getFullYear()}</strong><span>{grape ? `${records.length} 条${grape}记录` : `共 ${records.length} 次品鉴`}</span></div><div className="records-timeline">{records.map((record, index) => { const date = splitRecordDate(record.date); const photos = record.photos ?? []; return <article className="timeline-record" key={record.id}><time className="timeline-date" dateTime={record.createdAt}><strong>{date.day}</strong><span>{date.month}</span></time><div className="timeline-dot" aria-hidden="true" /><div className="timeline-content"><div className="timeline-meta"><span>{record.grape}</span><small>{record.region}</small></div>{photos.length > 0 && <div className={`timeline-photo-grid count-${Math.min(photos.length, 3)}`}>{photos.slice(0, 9).map((photo, photoIndex) => <div key={photo}><button className="timeline-photo-button" onClick={() => setViewer({ photos, index: photoIndex, wine: record.wine })} aria-label={`查看${record.wine}第${photoIndex + 1}张照片`}><img className="timeline-photo" src={photo} alt={`${record.wine}品鉴照片 ${photoIndex + 1}`} draggable={false} loading={index < 2 ? "eager" : "lazy"} decoding="async" />{photoIndex === 8 && photos.length > 9 && <span>+{photos.length - 9}</span>}</button></div>)}</div>}<h2>{record.wine}{record.year ? ` · ${record.year}` : ""}</h2><p>{record.note || "这一杯还没有写下品鉴感受。"}</p>{record.flavors && record.flavors.length > 0 && <div className="timeline-flavors">{record.flavors.slice(0, 4).map((flavor) => <span key={flavor}>{flavor}</span>)}</div>}</div></article>; })}</div></main></MobileScroll>{viewer && <div className="photo-viewer" role="dialog" aria-modal="true" aria-label={`${viewer.wine}照片详情`} onClick={() => setViewer(null)}><header><button onClick={() => setViewer(null)} aria-label="关闭照片详情">×</button><span>{viewer.index + 1} / {viewer.photos.length}</span></header><div className="photo-viewer-stage" onClick={(event) => event.stopPropagation()}>{viewer.photos.length > 1 && <button className="photo-viewer-prev" onClick={() => moveViewer(-1)} aria-label="上一张照片">‹</button>}<img src={viewer.photos[viewer.index]} alt={`${viewer.wine}照片详情`} />{viewer.photos.length > 1 && <button className="photo-viewer-next" onClick={() => moveViewer(1)} aria-label="下一张照片">›</button>}</div><footer>{viewer.wine}</footer></div>}</>;
 }
 
 function ShareAtlasScreen({ records, account, onBack }: { records: TastingRecord[]; account: WineAccount | null; onBack: () => void }) {

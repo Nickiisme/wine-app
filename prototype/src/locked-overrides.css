@@ -655,6 +655,18 @@
 .timeline-photo-grid.count-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .timeline-photo-grid > div { position: relative; aspect-ratio: 1; min-width: 0; }
 
+.timeline-photo-button {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 8px;
+  padding: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
 .timeline-photo {
   display: block;
   width: 100%;
@@ -665,7 +677,7 @@
   box-shadow: 0 3px 10px rgba(64, 42, 34, .08);
 }
 
-.timeline-photo-grid > div > span {
+.timeline-photo-button > span {
   position: absolute;
   inset: 0;
   border-radius: 8px;
@@ -676,6 +688,31 @@
   font-size: 18px;
   font-weight: 700;
 }
+
+.photo-viewer {
+  position: absolute;
+  z-index: 120;
+  inset: 0;
+  box-sizing: border-box;
+  padding: max(18px, env(safe-area-inset-top)) 14px max(18px, env(safe-area-inset-bottom));
+  background: rgba(22, 18, 17, .96);
+  color: #fff;
+  display: grid;
+  grid-template-rows: 42px 1fr 34px;
+  animation: photo-viewer-in 180ms ease-out;
+}
+
+@keyframes photo-viewer-in { from { opacity: 0; } to { opacity: 1; } }
+
+.photo-viewer header { display: grid; grid-template-columns: 42px 1fr 42px; align-items: center; }
+.photo-viewer header button { width: 36px; height: 36px; border: 0; border-radius: 50%; background: rgba(255,255,255,.1); color: #fff; font-size: 25px; line-height: 1; }
+.photo-viewer header span { grid-column: 2; color: rgba(255,255,255,.78); font-size: 11px; text-align: center; }
+.photo-viewer-stage { position: relative; min-height: 0; display: grid; place-items: center; }
+.photo-viewer-stage img { display: block; max-width: 100%; max-height: 100%; border-radius: 10px; object-fit: contain; }
+.photo-viewer-stage > button { position: absolute; z-index: 2; top: 50%; width: 34px; height: 52px; border: 0; border-radius: 17px; background: rgba(0,0,0,.35); color: #fff; font-size: 31px; transform: translateY(-50%); }
+.photo-viewer-prev { left: 5px; }
+.photo-viewer-next { right: 5px; }
+.photo-viewer footer { overflow: hidden; color: rgba(255,255,255,.72); font-size: 11px; line-height: 34px; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
 
 .timeline-content h2 {
   margin: 12px 0 5px;
@@ -708,6 +745,12 @@
   min-height: 132px;
   overflow: hidden;
   line-height: 1.7;
+}
+
+/* iOS zooms pages when a focused editor is rendered below 16px. */
+.wine-app input:not([type="range"]),
+.wine-app textarea {
+  font-size: 16px !important;
 }
 
 .note-photos {
