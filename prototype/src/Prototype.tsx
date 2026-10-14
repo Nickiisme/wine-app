@@ -139,16 +139,18 @@ export default function Prototype() {
   useEffect(() => {
     let active = true;
     listTastingRecords()
-      .then(async (cloudRecords) => {
+      .then((cloudRecords) => {
         if (!active) return;
         setRecords(cloudRecords);
         setCloudMessage(null);
-        const currentAccount = await (await getAccountApi()).getCurrentAccount();
-        if (active) setAccount(currentAccount);
       })
       .catch(() => {
         if (active) setCloudMessage("云端记录加载失败，请稍后重试");
       });
+    getAccountApi()
+      .then((accountApi) => accountApi.getCurrentAccount())
+      .then((currentAccount) => { if (active) setAccount(currentAccount); })
+      .catch(() => { if (active) setAccount(null); });
     return () => { active = false; };
   }, []);
 
@@ -187,7 +189,7 @@ export default function Prototype() {
 
   return (
     <div className="wine-app">
-      {screen === "explore" && <ExploreScreen tab={tab} records={records} onTab={setTab} onRecord={openCamera} onProfile={() => go("profile")} onNotes={(grape) => { setRecordFilter(grape); go("records"); }} />}
+      {screen === "explore" && <ExploreScreen tab={tab} records={records} account={account} onTab={setTab} onRecord={openCamera} onProfile={() => go("profile")} onNotes={(grape) => { setRecordFilter(grape); go("records"); }} />}
       {screen === "confirm" && <ConfirmScreen draft={draft} onChange={setDraft} onBack={() => go("explore")} onNext={() => go("taste")} />}
       {screen === "taste" && <TasteScreen liked={liked} setLiked={setLiked} selectedFlavors={selectedFlavors} toggleFlavor={(flavor) => setSelectedFlavors((current) => current.includes(flavor) ? current.filter((item) => item !== flavor) : [...current, flavor])} note={tastingNote} onNoteChange={setTastingNote} bodyLevel={bodyLevel} onBodyLevel={setBodyLevel} photos={draft.photos} onCamera={() => noteCameraInput.current?.click()} onGallery={() => noteGalleryInput.current?.click()} onRemovePhoto={(id) => setDraft((current) => ({ ...current, photos: current.photos.filter((photo) => photo.id !== id) }))} onBack={() => go("confirm")} onSave={saveTasting} saving={savingRecord} cloudMessage={cloudMessage} />}
       {screen === "success" && <SuccessScreen grape={draft.grape} onDone={() => go("explore")} />}
@@ -215,16 +217,17 @@ function RecordOption({ icon, title, detail, primary, onClick }: { icon: ReactNo
   return <button className={`record-option ${primary ? "primary" : ""}`} onClick={onClick}>{icon}<span><strong>{title}</strong><small>{detail}</small></span></button>;
 }
 
-function ExploreScreen({ tab, records, onTab, onRecord, onProfile, onNotes }: { tab: ExploreTab; records: TastingRecord[]; onTab: (tab: ExploreTab) => void; onRecord: () => void; onProfile: () => void; onNotes: (grape: string) => void }) {
+function ExploreScreen({ tab, records, account, onTab, onRecord, onProfile, onNotes }: { tab: ExploreTab; records: TastingRecord[]; account: WineAccount | null; onTab: (tab: ExploreTab) => void; onRecord: () => void; onProfile: () => void; onNotes: (grape: string) => void }) {
   const [selectedGrape, setSelectedGrape] = useState<GrapeNode | null>(null);
   const detail = selectedGrape ? grapeDetails[selectedGrape.name] : null;
   const stats = getRecordStats(records);
   const selectedCount = selectedGrape ? stats.grapeCounts[selectedGrape.name] ?? 0 : 0;
   const selectedLocked = selectedCount === 0;
+  const greeting = account && !account.isAnonymous ? `晚上好，${account.name} 🍷` : "晚上好 🍷";
   return <>
     <MobileScroll className={`app-scroll paper-screen ${tab === "regions" ? "region-page" : ""}`}>
       <main className={`explore-content ${tab === "regions" ? "region-explore-content" : ""}`}>
-        <header className="welcome"><p className="eyebrow">晚上好，Nicki</p><h1>你的葡萄酒世界已点亮：</h1><p className="stats"><strong>{stats.grapeCount}</strong> 个品种 <i>·</i> <strong>{stats.regionCount}</strong> 个产区 <i>·</i> <strong>{stats.recordCount}</strong> 次品鉴</p></header>
+        <header className="welcome"><p className="eyebrow">{greeting}</p><h1>你的葡萄酒世界已点亮：</h1><p className="stats"><strong>{stats.grapeCount}</strong> 个品种 <i>·</i> <strong>{stats.regionCount}</strong> 个产区 <i>·</i> <strong>{stats.recordCount}</strong> 次品鉴</p></header>
         <div className="atlas-tabs" role="tablist" aria-label="图鉴视图"><button className={tab === "grapes" ? "active" : ""} onClick={() => onTab("grapes")}>品种图鉴</button><button className={tab === "regions" ? "active" : ""} onClick={() => onTab("regions")}>产区地图</button></div>
         {tab === "grapes" ? <GrapeAtlas records={records} onSelect={setSelectedGrape} /> : <RegionMap records={records} />}
       </main>
@@ -399,7 +402,7 @@ function ProfileScreen({ records, account, onExplore, onRecord, onRecords, onFla
     { name: "初次举杯", note: "旅程开始", icon: <CheckCircledIcon />, tier: "gray" },
   ];
   const stats = getRecordStats(records);
-  const displayName = account && !account.isAnonymous ? account.name : "Nicki";
+  const displayName = account && !account.isAnonymous ? account.name : "葡萄酒探索者";
   return <><MobileScroll className="app-scroll paper-screen"><main className="profile-content"><p className="eyebrow">我的</p><div className="profile-head"><span>{displayName.slice(0, 1).toUpperCase()}</span><div><h1>{displayName}</h1><p>{stats.grapeCount} 个品种 · {stats.regionCount} 个产区 · {stats.recordCount} 次品鉴</p></div></div><section className="badge-section"><div className="section-title"><h2>我的徽章</h2><button>全部 <span>›</span></button></div><Carousel className="badge-carousel" contentClassName="badge-row" ariaLabel="我的徽章，可左右滑动">{badges.map((badge) => <button className={`badge-item ${badge.tier}`} key={badge.name}><span className="badge-coin"><span>{badge.icon}</span></span><strong>{badge.name}</strong><small>{badge.note}</small></button>)}</Carousel></section><section className="footprint-section"><div className="section-title"><h2>我的足迹</h2></div><div className="footprint-row"><button onClick={onRecords} aria-label={`查看${stats.recordCount}条品鉴记录`}><strong>{stats.recordCount}</strong><span>品鉴记录</span></button><button><strong>{stats.grapeCount}</strong><span>葡萄品种</span></button><button><strong>{stats.regionCount}</strong><span>探索产区</span></button></div></section><div className="profile-menu"><button onClick={onFlavor}>我的风味偏好<span>›</span></button><button onClick={onShare}>分享我的图鉴<span>›</span></button><button onClick={onSettings}>设置<span>›</span></button></div></main></MobileScroll><BottomNav active="profile" onExplore={onExplore} onRecord={onRecord} onProfile={() => {}} /></>;
 }
 
@@ -480,7 +483,7 @@ function ShareAtlasScreen({ records, account, onBack }: { records: TastingRecord
   const [shared, setShared] = useState(false);
   const stats = getRecordStats(records);
   const photos = records.flatMap((record) => record.photos ?? []).slice(0, 9);
-  const displayName = account && !account.isAnonymous ? account.name : "Nicki";
+  const displayName = account && !account.isAnonymous ? account.name : "葡萄酒探索者";
   const share = async () => {
     const text = `${displayName} 的葡萄酒图鉴：已点亮 ${stats.grapeCount} 个品种、${stats.regionCount} 个产区，完成 ${stats.recordCount} 次品鉴。`;
     try {
