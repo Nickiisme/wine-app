@@ -762,10 +762,21 @@
   align-items: center;
   justify-content: flex-end;
   gap: 7px;
+  min-width: 0;
   color: #342a27;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 400;
 }
+
+.select-field > strong > span {
+  min-width: 0;
+  overflow: hidden;
+  color: #342a27;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.select-field > strong > svg { flex: 0 0 auto; }
 
 .select-field svg { width: 15px; height: 15px; color: #8e817a; }
 
@@ -810,6 +821,7 @@
 }
 
 .picker-options button.selected { color: #7e1637; font-weight: 700; }
+.picker-options button span { line-height: 1.45; }
 .picker-options button svg { color: #7e1637; }
 .picker-empty { padding: 22px 0; color: #958983; text-align: center; font-size: 12px; }
 

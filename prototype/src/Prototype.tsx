@@ -11,6 +11,7 @@ type GrapeNode = { name: string; english: string; image: string; side: "left" | 
 type GrapeDetail = { intro: string; taste: string; aromas: string[]; regions: string };
 type DraftPhoto = { id: string; preview: string; file: File };
 type WineDraft = { wine: string; year: string; grape: string; country: string; region: string; photos: DraftPhoto[] };
+type PickerOption = { value: string; label: string };
 const asset = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, "")}`;
 const getAccountApi = () => import("./lib/cloudbase");
 const grapeDetails: Record<string, GrapeDetail> = {
@@ -33,6 +34,45 @@ const grapeNodes: GrapeNode[] = [
   { name: "桑娇维塞", english: "Sangiovese", image: asset("assets/grapes/riesling.webp"), side: "left", locked: true },
 ];
 const flavors = ["草莓", "樱桃", "花香", "香草", "香料", "烟熏"];
+const bilingual = (value: string, english: string): PickerOption => ({ value, label: `${value} · ${english}` });
+const grapeOptions: PickerOption[] = [
+  bilingual("赤霞珠", "Cabernet Sauvignon"), bilingual("梅洛", "Merlot"), bilingual("黑皮诺", "Pinot Noir"), bilingual("霞多丽", "Chardonnay"),
+  bilingual("长相思", "Sauvignon Blanc"), bilingual("雷司令", "Riesling"), bilingual("西拉", "Syrah / Shiraz"), bilingual("歌海娜", "Grenache"),
+  bilingual("桑娇维塞", "Sangiovese"), bilingual("丹魄", "Tempranillo"), bilingual("马尔贝克", "Malbec"), bilingual("内比奥罗", "Nebbiolo"),
+  bilingual("白诗南", "Chenin Blanc"), bilingual("灰皮诺", "Pinot Gris / Pinot Grigio"), bilingual("琼瑶浆", "Gewürztraminer"), bilingual("维欧尼", "Viognier"),
+  bilingual("品丽珠", "Cabernet Franc"), bilingual("佳美", "Gamay"), bilingual("仙粉黛", "Zinfandel / Primitivo"), bilingual("慕合怀特", "Mourvèdre / Monastrell"),
+  bilingual("佳美娜", "Carménère"), bilingual("巴贝拉", "Barbera"), bilingual("蒙特普齐亚诺", "Montepulciano"), bilingual("科维纳", "Corvina"),
+  bilingual("歌蕾拉", "Glera"), bilingual("阿尔巴利诺", "Albariño"), bilingual("绿维特利纳", "Grüner Veltliner"), bilingual("赛美蓉", "Sémillon"),
+  bilingual("麝香", "Muscat / Moscato"), bilingual("皮诺莫尼耶", "Pinot Meunier"), bilingual("国产多瑞加", "Touriga Nacional"), bilingual("阿斯提可", "Assyrtiko"),
+  bilingual("富尔民特", "Furmint"), bilingual("马瑟兰", "Marselan"), bilingual("小维多", "Petit Verdot"), bilingual("丹娜", "Tannat"),
+];
+const countryOptions: PickerOption[] = [
+  bilingual("法国", "France"), bilingual("意大利", "Italy"), bilingual("西班牙", "Spain"), bilingual("德国", "Germany"), bilingual("葡萄牙", "Portugal"),
+  bilingual("美国", "United States"), bilingual("澳大利亚", "Australia"), bilingual("新西兰", "New Zealand"), bilingual("智利", "Chile"), bilingual("阿根廷", "Argentina"),
+  bilingual("南非", "South Africa"), bilingual("中国", "China"), bilingual("奥地利", "Austria"), bilingual("匈牙利", "Hungary"), bilingual("希腊", "Greece"),
+  bilingual("加拿大", "Canada"), bilingual("格鲁吉亚", "Georgia"), bilingual("日本", "Japan"), bilingual("乌拉圭", "Uruguay"),
+];
+const regionOptionsByCountry: Record<string, PickerOption[]> = {
+  法国: [bilingual("勃艮第", "Burgundy"), bilingual("波尔多", "Bordeaux"), bilingual("香槟", "Champagne"), bilingual("卢瓦尔河谷", "Loire Valley"), bilingual("罗讷河谷", "Rhône Valley"), bilingual("阿尔萨斯", "Alsace"), bilingual("普罗旺斯", "Provence"), bilingual("朗格多克-鲁西永", "Languedoc-Roussillon"), bilingual("博若莱", "Beaujolais"), bilingual("汝拉", "Jura")],
+  意大利: [bilingual("托斯卡纳", "Tuscany"), bilingual("皮埃蒙特", "Piedmont"), bilingual("威尼托", "Veneto"), bilingual("西西里", "Sicily"), bilingual("弗留利", "Friuli"), bilingual("特伦蒂诺-上阿迪杰", "Trentino-Alto Adige"), bilingual("艾米利亚-罗马涅", "Emilia-Romagna"), bilingual("普利亚", "Puglia"), bilingual("坎帕尼亚", "Campania"), bilingual("撒丁岛", "Sardinia")],
+  西班牙: [bilingual("里奥哈", "Rioja"), bilingual("杜埃罗河岸", "Ribera del Duero"), bilingual("普里奥拉托", "Priorat"), bilingual("佩内德斯", "Penedès"), bilingual("下海湾", "Rías Baixas"), bilingual("卢埃达", "Rueda"), bilingual("赫雷斯", "Jerez"), bilingual("托罗", "Toro"), bilingual("比埃尔索", "Bierzo"), bilingual("拉曼恰", "La Mancha")],
+  德国: [bilingual("摩泽尔", "Mosel"), bilingual("莱茵高", "Rheingau"), bilingual("法尔兹", "Pfalz"), bilingual("莱茵黑森", "Rheinhessen"), bilingual("巴登", "Baden"), bilingual("纳赫", "Nahe"), bilingual("弗兰肯", "Franken"), bilingual("阿尔", "Ahr")],
+  葡萄牙: [bilingual("杜罗河谷", "Douro"), bilingual("绿酒产区", "Vinho Verde"), bilingual("阿连特茹", "Alentejo"), bilingual("杜奥", "Dão"), bilingual("百拉达", "Bairrada"), bilingual("马德拉", "Madeira"), bilingual("塞图巴尔", "Setúbal")],
+  美国: [bilingual("纳帕谷", "Napa Valley"), bilingual("索诺玛", "Sonoma"), bilingual("威拉米特谷", "Willamette Valley"), bilingual("圣巴巴拉", "Santa Barbara"), bilingual("帕索罗布尔斯", "Paso Robles"), bilingual("哥伦比亚谷", "Columbia Valley"), bilingual("手指湖", "Finger Lakes"), bilingual("门多西诺", "Mendocino")],
+  澳大利亚: [bilingual("巴罗萨谷", "Barossa Valley"), bilingual("雅拉谷", "Yarra Valley"), bilingual("玛格丽特河", "Margaret River"), bilingual("猎人谷", "Hunter Valley"), bilingual("麦克拉伦谷", "McLaren Vale"), bilingual("库纳瓦拉", "Coonawarra"), bilingual("阿德莱德山区", "Adelaide Hills"), bilingual("克莱尔谷", "Clare Valley"), bilingual("伊顿谷", "Eden Valley"), bilingual("塔斯马尼亚", "Tasmania")],
+  新西兰: [bilingual("马尔堡", "Marlborough"), bilingual("中奥塔哥", "Central Otago"), bilingual("霍克斯湾", "Hawke's Bay"), bilingual("马丁堡", "Martinborough"), bilingual("纳尔逊", "Nelson"), bilingual("坎特伯雷", "Canterbury"), bilingual("吉斯本", "Gisborne"), bilingual("奥克兰", "Auckland")],
+  智利: [bilingual("迈坡谷", "Maipo Valley"), bilingual("空加瓜谷", "Colchagua Valley"), bilingual("卡萨布兰卡谷", "Casablanca Valley"), bilingual("阿空加瓜谷", "Aconcagua Valley"), bilingual("利马里谷", "Limarí Valley"), bilingual("库里科谷", "Curicó Valley"), bilingual("伊塔塔谷", "Itata Valley"), bilingual("比奥比奥谷", "Bío Bío Valley")],
+  阿根廷: [bilingual("门多萨", "Mendoza"), bilingual("优克谷", "Uco Valley"), bilingual("萨尔塔", "Salta"), bilingual("卡法亚特", "Cafayate"), bilingual("巴塔哥尼亚", "Patagonia"), bilingual("圣胡安", "San Juan")],
+  南非: [bilingual("斯泰伦博斯", "Stellenbosch"), bilingual("斯沃特兰", "Swartland"), bilingual("帕尔", "Paarl"), bilingual("康斯坦蒂亚", "Constantia"), bilingual("沃克湾", "Walker Bay"), bilingual("罗伯森", "Robertson"), bilingual("黑地", "Elgin")],
+  中国: [bilingual("宁夏贺兰山东麓", "Ningxia Helan Mountain East Foothills"), bilingual("新疆", "Xinjiang"), bilingual("山东蓬莱", "Penglai, Shandong"), bilingual("云南香格里拉", "Shangri-La, Yunnan"), bilingual("河北怀来", "Huailai, Hebei"), bilingual("甘肃河西走廊", "Hexi Corridor, Gansu"), bilingual("北京房山", "Fangshan, Beijing")],
+  奥地利: [bilingual("瓦豪", "Wachau"), bilingual("坎普谷", "Kamptal"), bilingual("克雷姆斯谷", "Kremstal"), bilingual("布尔根兰", "Burgenland"), bilingual("葡萄酒区", "Weinviertel"), bilingual("施蒂里亚", "Styria")],
+  匈牙利: [bilingual("托卡伊", "Tokaj"), bilingual("埃格尔", "Eger"), bilingual("维拉尼", "Villány"), bilingual("绍姆洛", "Somló"), bilingual("巴拉顿", "Balaton")],
+  希腊: [bilingual("圣托里尼", "Santorini"), bilingual("尼米亚", "Nemea"), bilingual("纳乌萨", "Naoussa"), bilingual("克里特", "Crete"), bilingual("曼蒂尼亚", "Mantinia")],
+  加拿大: [bilingual("奥肯那根谷", "Okanagan Valley"), bilingual("尼亚加拉半岛", "Niagara Peninsula"), bilingual("爱德华王子县", "Prince Edward County"), bilingual("安纳波利斯谷", "Annapolis Valley")],
+  格鲁吉亚: [bilingual("卡赫季", "Kakheti"), bilingual("卡尔特利", "Kartli"), bilingual("伊梅列季", "Imereti"), bilingual("拉恰", "Racha")],
+  日本: [bilingual("山梨", "Yamanashi"), bilingual("长野", "Nagano"), bilingual("北海道", "Hokkaido"), bilingual("山形", "Yamagata")],
+  乌拉圭: [bilingual("卡内洛内斯", "Canelones"), bilingual("蒙得维的亚", "Montevideo"), bilingual("马尔多纳多", "Maldonado"), bilingual("科洛尼亚", "Colonia")],
+};
 const newDraft = (): WineDraft => ({ wine: "", year: String(new Date().getFullYear()), grape: "黑皮诺", country: "法国", region: "勃艮第", photos: [] });
 
 function previewFile(file: File) {
@@ -346,37 +386,29 @@ function RegionMap({ records }: { records: TastingRecord[] }) {
 
 function ConfirmScreen({ draft, onChange, onBack, onNext }: { draft: WineDraft; onChange: (draft: WineDraft) => void; onBack: () => void; onNext: () => void }) {
   const [picker, setPicker] = useState<"year" | "grape" | "country" | "region" | null>(null);
-  const years = Array.from({ length: 41 }, (_, index) => String(new Date().getFullYear() - index));
-  const grapes = ["赤霞珠", "梅洛", "黑皮诺", "霞多丽", "长相思", "雷司令", "西拉", "歌海娜", "桑娇维塞", "马尔贝克"];
-  const regionsByCountry: Record<string, string[]> = {
-    法国: ["勃艮第", "波尔多", "香槟", "卢瓦尔河谷", "罗讷河谷", "普罗旺斯"],
-    意大利: ["托斯卡纳", "皮埃蒙特", "威尼托", "西西里"],
-    中国: ["宁夏贺兰山东麓", "新疆", "山东蓬莱", "云南香格里拉"],
-    美国: ["纳帕谷", "索诺玛", "威拉米特谷", "圣巴巴拉"],
-    澳大利亚: ["巴罗萨谷", "雅拉谷", "玛格丽特河", "猎人谷"],
-    新西兰: ["马尔堡", "中奥塔哥", "霍克斯湾", "马丁堡"],
-  };
-  const countries = Object.keys(regionsByCountry);
+  const years = Array.from({ length: 61 }, (_, index) => { const value = String(new Date().getFullYear() - index); return { value, label: value }; });
   const update = (value: Partial<WineDraft>) => onChange({ ...draft, ...value });
   const pickerConfig = picker ? {
     year: { title: "选择年份", options: years, value: draft.year, searchable: false, onSelect: (value: string) => update({ year: value }) },
-    grape: { title: "选择葡萄品种", options: grapes, value: draft.grape, searchable: true, onSelect: (value: string) => update({ grape: value }) },
-    country: { title: "选择国家", options: countries, value: draft.country, searchable: true, onSelect: (value: string) => update({ country: value, region: regionsByCountry[value][0] }) },
-    region: { title: "选择产区", options: regionsByCountry[draft.country] ?? [], value: draft.region, searchable: true, onSelect: (value: string) => update({ region: value }) },
+    grape: { title: "选择葡萄品种", options: grapeOptions, value: draft.grape, searchable: true, onSelect: (value: string) => update({ grape: value }) },
+    country: { title: "选择国家", options: countryOptions, value: draft.country, searchable: true, onSelect: (value: string) => update({ country: value, region: regionOptionsByCountry[value]?.[0]?.value ?? "" }) },
+    region: { title: "选择产区", options: regionOptionsByCountry[draft.country] ?? [], value: draft.region, searchable: true, onSelect: (value: string) => update({ region: value }) },
   }[picker] : null;
   const firstPhoto = draft.photos[0]?.preview;
-  return <><MobileScroll className="app-scroll paper-screen"><main className="flow-content"><FlowHeader title="确认酒款" onBack={onBack} />{firstPhoto && <div className="label-photo has-photo"><img src={firstPhoto} alt="刚刚拍摄的酒标" /><div><strong>{draft.wine || "待确认酒款"}</strong><span>{draft.grape} · {draft.year}</span></div><span className="scan-pill"><CheckIcon /> 已识别</span></div>}<p className="helper-copy">{firstPhoto ? "请确认识别结果，点按任意字段即可修改。" : "手动填写酒款信息；只有酒款名称会唤起键盘。"}</p><div className="form-list"><Field label="酒款名称" value={draft.wine} onChange={(wine) => update({ wine })} /><SelectField label="年份" value={draft.year} onClick={() => setPicker("year")} /><SelectField label="葡萄品种" value={draft.grape} onClick={() => setPicker("grape")} /><SelectField label="国家" value={draft.country} onClick={() => setPicker("country")} /><SelectField label="产区" value={draft.region} onClick={() => setPicker("region")} /></div><button className="primary-action" onClick={onNext}>确认，继续</button></main></MobileScroll>{pickerConfig && <OptionPicker open={!!picker} onOpenChange={(open) => { if (!open) setPicker(null); }} title={pickerConfig.title} options={pickerConfig.options} value={pickerConfig.value} searchable={pickerConfig.searchable} onSelect={(value) => { pickerConfig.onSelect(value); setPicker(null); }} />}</>;
+  const displayValue = (options: PickerOption[], value: string) => options.find((option) => option.value === value)?.label ?? value;
+  return <><MobileScroll className="app-scroll paper-screen"><main className="flow-content"><FlowHeader title="确认酒款" onBack={onBack} />{firstPhoto && <div className="label-photo has-photo"><img src={firstPhoto} alt="刚刚拍摄的酒标" /><div><strong>{draft.wine || "待确认酒款"}</strong><span>{displayValue(grapeOptions, draft.grape)} · {draft.year}</span></div><span className="scan-pill"><CheckIcon /> 已识别</span></div>}<p className="helper-copy">{firstPhoto ? "请确认识别结果，点按任意字段即可修改。" : "手动填写酒款信息；只有酒款名称会唤起键盘。"}</p><div className="form-list"><Field label="酒款名称" value={draft.wine} onChange={(wine) => update({ wine })} /><SelectField label="年份" value={draft.year} onClick={() => setPicker("year")} /><SelectField label="葡萄品种" value={displayValue(grapeOptions, draft.grape)} onClick={() => setPicker("grape")} /><SelectField label="国家" value={displayValue(countryOptions, draft.country)} onClick={() => setPicker("country")} /><SelectField label="产区" value={displayValue(regionOptionsByCountry[draft.country] ?? [], draft.region)} onClick={() => setPicker("region")} /></div><button className="primary-action" onClick={onNext}>确认，继续</button></main></MobileScroll>{pickerConfig && <OptionPicker open={!!picker} onOpenChange={(open) => { if (!open) setPicker(null); }} title={pickerConfig.title} options={pickerConfig.options} value={pickerConfig.value} searchable={pickerConfig.searchable} onSelect={(value) => { pickerConfig.onSelect(value); setPicker(null); }} />}</>;
 }
 
 function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <label className="field-row"><span>{label}</span><input value={value} onChange={(event) => onChange(event.currentTarget.value)} placeholder="请输入酒款名称" aria-label={label} /></label>; }
 
-function SelectField({ label, value, onClick }: { label: string; value: string; onClick: () => void }) { return <button className="field-row select-field" onClick={onClick} aria-label={`${label}，当前为${value}`}><span>{label}</span><strong>{value}<ChevronDownIcon /></strong></button>; }
+function SelectField({ label, value, onClick }: { label: string; value: string; onClick: () => void }) { return <button className="field-row select-field" onClick={onClick} aria-label={`${label}，当前为${value}`}><span>{label}</span><strong><span>{value}</span><ChevronDownIcon /></strong></button>; }
 
-function OptionPicker({ open, onOpenChange, title, options, value, searchable, onSelect }: { open: boolean; onOpenChange: (open: boolean) => void; title: string; options: string[]; value: string; searchable: boolean; onSelect: (value: string) => void }) {
+function OptionPicker({ open, onOpenChange, title, options, value, searchable, onSelect }: { open: boolean; onOpenChange: (open: boolean) => void; title: string; options: PickerOption[]; value: string; searchable: boolean; onSelect: (value: string) => void }) {
   const [query, setQuery] = useState("");
   useEffect(() => { if (!open) setQuery(""); }, [open]);
-  const visibleOptions = options.filter((option) => option.toLowerCase().includes(query.trim().toLowerCase()));
-  return <BottomSheet open={open} onOpenChange={onOpenChange} title={title} description={searchable ? "输入关键词或直接选择" : "选择酒标上的年份"} snap={0.62}><div className="option-picker" tabIndex={0} aria-label={`${title}选项`}>{searchable && <div className="picker-search"><KeyboardInput value={query} onChange={(event) => setQuery(event.currentTarget.value)} placeholder={`搜索${title.replace("选择", "")}`} aria-label={`搜索${title.replace("选择", "")}`} /></div>}<div className="picker-options">{visibleOptions.map((option) => <button className={option === value ? "selected" : ""} onClick={() => onSelect(option)} key={option}><span>{option}</span>{option === value && <CheckIcon />}</button>)}{visibleOptions.length === 0 && <p className="picker-empty">没有找到相关选项</p>}</div></div></BottomSheet>;
+  const normalizedQuery = query.trim().toLowerCase();
+  const visibleOptions = options.filter((option) => `${option.value} ${option.label}`.toLowerCase().includes(normalizedQuery));
+  return <BottomSheet open={open} onOpenChange={onOpenChange} title={title} description={searchable ? "支持中文或英文搜索，常用品项优先" : "选择酒标上的年份"} snap={0.68}><div className="option-picker" tabIndex={0} aria-label={`${title}选项`}>{searchable && <div className="picker-search"><KeyboardInput value={query} onChange={(event) => setQuery(event.currentTarget.value)} placeholder={`搜索${title.replace("选择", "")}`} aria-label={`搜索${title.replace("选择", "")}`} /></div>}<div className="picker-options">{visibleOptions.map((option) => <button className={option.value === value ? "selected" : ""} onClick={() => onSelect(option.value)} key={option.value}><span>{option.label}</span>{option.value === value && <CheckIcon />}</button>)}{visibleOptions.length === 0 && <p className="picker-empty">没有找到相关选项</p>}</div></div></BottomSheet>;
 }
 
 function TasteScreen({ liked, setLiked, selectedFlavors, toggleFlavor, note, onNoteChange, bodyLevel, onBodyLevel, photos, onCamera, onGallery, onRemovePhoto, onBack, onSave, saving, cloudMessage }: { liked: string; setLiked: (liked: string) => void; selectedFlavors: string[]; toggleFlavor: (flavor: string) => void; note: string; onNoteChange: (note: string) => void; bodyLevel: number; onBodyLevel: (value: number) => void; photos: DraftPhoto[]; onCamera: () => void; onGallery: () => void; onRemovePhoto: (id: string) => void; onBack: () => void; onSave: () => Promise<void>; saving: boolean; cloudMessage: string | null }) {
