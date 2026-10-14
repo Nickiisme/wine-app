@@ -44,6 +44,29 @@ function previewFile(file: File) {
   });
 }
 
+function keepEditorAboveKeyboard(editor: HTMLElement) {
+  const scroll = editor.closest<HTMLElement>(".mobile-scroll");
+  if (!scroll) return;
+  const scrollBounds = scroll.getBoundingClientRect();
+  const editorBounds = editor.getBoundingClientRect();
+  const margin = 20;
+  const visibleTop = scrollBounds.top + margin;
+  const visibleBottom = scrollBounds.bottom - margin;
+  let nextScrollTop = scroll.scrollTop;
+
+  if (editorBounds.bottom > visibleBottom) {
+    nextScrollTop += editorBounds.bottom - visibleBottom;
+  } else if (editorBounds.top < visibleTop) {
+    nextScrollTop -= visibleTop - editorBounds.top;
+  }
+
+  const maxScrollTop = Math.max(0, scroll.scrollHeight - scroll.clientHeight);
+  const clamped = Math.max(0, Math.min(maxScrollTop, nextScrollTop));
+  if (Math.abs(clamped - scroll.scrollTop) > 1) {
+    scroll.scrollTo({ top: clamped, behavior: "smooth" });
+  }
+}
+
 export default function Prototype() {
   const keyboard = useKeyboard();
   const [screen, setScreen] = useState<Screen>("explore");
@@ -88,6 +111,30 @@ export default function Prototype() {
     const nextPhotos = await Promise.all(files.map(previewFile));
     setDraft((current) => ({ ...current, photos: [...current.photos, ...nextPhotos].slice(0, 9) }));
   };
+
+  useEffect(() => {
+    const timers = new Set<number>();
+    const scheduleVisibilityCheck = (target: EventTarget | null, afterKeyboardTransition: boolean) => {
+      if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) return;
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => keepEditorAboveKeyboard(target)));
+      if (afterKeyboardTransition) {
+        const timer = window.setTimeout(() => {
+          timers.delete(timer);
+          keepEditorAboveKeyboard(target);
+        }, 300);
+        timers.add(timer);
+      }
+    };
+    const onFocus = (event: FocusEvent) => scheduleVisibilityCheck(event.target, true);
+    const onInput = (event: Event) => scheduleVisibilityCheck(event.target, false);
+    document.addEventListener("focusin", onFocus);
+    document.addEventListener("input", onInput);
+    return () => {
+      document.removeEventListener("focusin", onFocus);
+      document.removeEventListener("input", onInput);
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
