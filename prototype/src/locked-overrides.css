@@ -2,6 +2,20 @@
   min-height: 1040px;
 }
 
+.wine-app .explore-content:not(.region-explore-content) {
+  overflow: visible;
+}
+
+.wine-app .atlas-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 16;
+  box-sizing: border-box;
+  background: rgba(251, 247, 239, .96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
 .wine-app .explore-content::after,
 .wine-app .grape-node::after {
   content: none !important;
@@ -534,6 +548,23 @@
 .settings-group > div { min-height: 51px; border-bottom: 1px solid #e3d9ce; display: flex; align-items: center; justify-content: space-between; gap: 14px; font-size: 12px; }
 .settings-group strong { color: #8a7d76; font-size: 10px; font-weight: 500; text-align: right; }
 .settings-note { margin: 22px 8px 0; color: #978b84; font-size: 9px; line-height: 1.6; text-align: center; }
+
+.guest-auth-choice {
+  min-height: calc(100dvh - 130px);
+  box-sizing: border-box;
+  padding: 88px 12px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.guest-auth-choice > span { font-size: 38px; }
+.guest-auth-choice h2 { margin: 15px 0 7px; color: #5d1028; font: 700 22px Georgia, "Noto Serif SC", serif; }
+.guest-auth-choice > p { margin: 0; color: #83766f; font-size: 11px; }
+.guest-auth-actions { width: 100%; margin-top: 30px; display: grid; gap: 11px; }
+.guest-auth-actions .account-primary { margin-top: 0; }
+.account-secondary { width: 100%; height: 46px; border: 1px solid rgba(126, 22, 55, .38); border-radius: 23px; background: transparent; color: #7e1637; font-size: 13px; font-weight: 700; }
 
 .auth-heading { padding: 5px 18px 20px; text-align: center; }
 .auth-heading > span { font-size: 33px; }

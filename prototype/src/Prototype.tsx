@@ -158,6 +158,7 @@ export default function Prototype() {
   const [savingRecord, setSavingRecord] = useState(false);
   const [cloudMessage, setCloudMessage] = useState<string | null>(null);
   const [account, setAccount] = useState<WineAccount | null>(null);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const cameraInput = useRef<HTMLInputElement>(null);
   const galleryInput = useRef<HTMLInputElement>(null);
   const noteCameraInput = useRef<HTMLInputElement>(null);
@@ -278,8 +279,8 @@ export default function Prototype() {
       {screen === "records" && <TastingRecordsScreen grape={recordFilter} records={records} cloudMessage={cloudMessage} onBack={() => go(recordFilter ? "explore" : "profile")} />}
       {screen === "flavor" && <FlavorPreferenceScreen records={records} onBack={() => go("profile")} />}
       {screen === "share" && <ShareAtlasScreen records={records} account={account} onBack={() => go("profile")} />}
-      {screen === "settings" && <SettingsScreen account={account} onBack={() => go("profile")} onAuth={() => go("auth")} onSignedOut={async () => { const guest = await (await getAccountApi()).signOutToGuest(); await refreshAccountData(guest); }} />}
-      {screen === "auth" && <AuthScreen onBack={() => go("settings")} onAuthenticated={async (nextAccount) => { await refreshAccountData(nextAccount); go("settings"); }} />}
+      {screen === "settings" && <SettingsScreen account={account} onBack={() => go("profile")} onAuth={(mode) => { setAuthMode(mode); go("auth"); }} onSignedOut={async () => { const guest = await (await getAccountApi()).signOutToGuest(); await refreshAccountData(guest); }} />}
+      {screen === "auth" && <AuthScreen initialMode={authMode} onBack={() => go("settings")} onAuthenticated={async (nextAccount) => { await refreshAccountData(nextAccount); go("settings"); }} />}
       <BottomSheet open={recordSheet} onOpenChange={setRecordSheet} title="拍摄酒标" description="对准正面酒标，自动识别酒款信息" snap={0.64}>
         <div className="record-camera-flow">
           <button className="camera-preview" onClick={openCamera} aria-label="拍照并识别酒标"><span className="camera-frame"><CameraIcon /></span><strong>将酒标完整放入框内</strong><small>点击拍摄并开始识别</small><span className="camera-shutter"><CameraIcon /></span></button>
@@ -479,7 +480,7 @@ function ProfileScreen({ records, account, onExplore, onRecord, onRecords, onFla
   return <><MobileScroll className="app-scroll paper-screen"><main className="profile-content"><p className="eyebrow">我的</p><div className="profile-head"><span>{displayName.slice(0, 1).toUpperCase()}</span><div><h1>{displayName}</h1><p>{stats.grapeCount} 个品种 · {stats.regionCount} 个产区 · {stats.recordCount} 次品鉴</p></div></div><section className="badge-section"><div className="section-title"><h2>我的徽章</h2><button>全部 <span>›</span></button></div><Carousel className="badge-carousel" contentClassName="badge-row" ariaLabel="我的徽章，可左右滑动">{badges.map((badge) => <button className={`badge-item ${badge.tier}`} key={badge.name}><span className="badge-coin"><span>{badge.icon}</span></span><strong>{badge.name}</strong><small>{badge.note}</small></button>)}</Carousel></section><section className="footprint-section"><div className="section-title"><h2>我的足迹</h2></div><div className="footprint-row"><button onClick={onRecords} aria-label={`查看${stats.recordCount}条品鉴记录`}><strong>{stats.recordCount}</strong><span>品鉴记录</span></button><button><strong>{stats.grapeCount}</strong><span>葡萄品种</span></button><button><strong>{stats.regionCount}</strong><span>探索产区</span></button></div></section><div className="profile-menu"><button onClick={onFlavor}>我的风味偏好<span>›</span></button><button onClick={onShare}>分享我的图鉴<span>›</span></button><button onClick={onSettings}>设置<span>›</span></button></div></main></MobileScroll><BottomNav active="profile" onExplore={onExplore} onRecord={onRecord} onProfile={() => {}} /></>;
 }
 
-function SettingsScreen({ account, onBack, onAuth, onSignedOut }: { account: WineAccount | null; onBack: () => void; onAuth: () => void; onSignedOut: () => Promise<void> }) {
+function SettingsScreen({ account, onBack, onAuth, onSignedOut }: { account: WineAccount | null; onBack: () => void; onAuth: (mode: "login" | "register") => void; onSignedOut: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const registered = Boolean(account && !account.isAnonymous);
@@ -488,12 +489,12 @@ function SettingsScreen({ account, onBack, onAuth, onSignedOut }: { account: Win
     setError(null);
     try { await onSignedOut(); } catch (reason) { setError(reason instanceof Error ? reason.message : "退出失败，请稍后重试"); } finally { setBusy(false); }
   };
-  return <MobileScroll className="app-scroll paper-screen"><main className="flow-content settings-content"><FlowHeader title="设置" onBack={onBack} /><section className={`account-card ${registered ? "registered" : "guest"}`}><span className="account-avatar">{registered ? account?.name.slice(0, 1).toUpperCase() : "N"}</span><div><small>{registered ? "已登录" : "游客模式"}</small><h2>{registered ? account?.name : "登录后保存你的葡萄酒世界"}</h2><p>{registered ? account?.email : "注册后可在不同设备同步品鉴记录与徽章"}</p></div></section>{registered ? <button className="account-primary" onClick={() => void signOut()} disabled={busy}>{busy ? "正在退出…" : "退出登录"}</button> : <button className="account-primary" onClick={onAuth}>登录或注册</button>}{error && <p className="auth-message error" role="alert">{error}</p>}<section className="settings-group"><h3>账号与数据</h3><div><span>云端同步</span><strong>{registered ? "已开启" : "游客数据仅限当前账号"}</strong></div><div><span>数据归属</span><strong>CloudBase 加密存储</strong></div></section><section className="settings-group"><h3>关于</h3><div><span>隐私说明</span><strong>›</strong></div><div><span>版本</span><strong>初心版 0.1</strong></div></section><p className="settings-note">注册会将当前游客身份升级为正式账号，已有品鉴记录会继续保留。</p></main></MobileScroll>;
+  return <MobileScroll className="app-scroll paper-screen"><main className="flow-content settings-content"><FlowHeader title="设置" onBack={onBack} />{registered ? <><section className="account-card registered"><span className="account-avatar">{account?.name.slice(0, 1).toUpperCase()}</span><div><small>已登录</small><h2>{account?.name}</h2><p>{account?.email}</p></div></section><button className="account-primary" onClick={() => void signOut()} disabled={busy}>{busy ? "正在退出…" : "退出登录"}</button>{error && <p className="auth-message error" role="alert">{error}</p>}<section className="settings-group"><h3>账号与数据</h3><div><span>云端同步</span><strong>已开启</strong></div><div><span>数据归属</span><strong>CloudBase 加密存储</strong></div></section><section className="settings-group"><h3>关于</h3><div><span>隐私说明</span><strong>›</strong></div><div><span>版本</span><strong>初心版 0.1</strong></div></section></> : <section className="guest-auth-choice"><span aria-hidden="true">🍷</span><h2>登录你的葡萄酒图鉴</h2><p>继续保存品鉴记录、徽章与风味偏好</p><div className="guest-auth-actions"><button className="account-primary" onClick={() => onAuth("login")}>登录</button><button className="account-secondary" onClick={() => onAuth("register")}>注册</button></div></section>}</main></MobileScroll>;
 }
 
-function AuthScreen({ onBack, onAuthenticated }: { onBack: () => void; onAuthenticated: (account: WineAccount) => Promise<void> }) {
+function AuthScreen({ initialMode, onBack, onAuthenticated }: { initialMode: "login" | "register"; onBack: () => void; onAuthenticated: (account: WineAccount) => Promise<void> }) {
   const keyboard = useKeyboard();
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<"login" | "register">(initialMode);
   const [loginMethod, setLoginMethod] = useState<"password" | "otp">("password");
   const [step, setStep] = useState<"form" | "verify">("form");
   const [nickname, setNickname] = useState("");

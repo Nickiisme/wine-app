@@ -9,6 +9,8 @@
 - Unlocked varieties each use a distinct, botanically differentiated illustration. Locked varieties all use one generic muted grape treatment while clearly showing the varietal name and `待探索` state.
 - Unlocking is immediate and restrained: update the node and show a short confirmation, without growth, fill, or elaborate reveal animation.
 - Keep bottom navigation to Explore, a central record action, and Profile. Explore switches between the grape atlas and region map.
+- Keep the grape-atlas / region-map switcher sticky at the top after the user scrolls past the home greeting.
+- When a guest opens Settings, lead directly with separate Login and Register choices. Do not show cloud-sync, data-ownership, or other signed-in account-management details until the user is authenticated.
 - Do not use progress bars, percentages, streaks, checklists, lessons, coins, rankings, or persistent task cards.
 
 In ChatGPT Work Mode, run `sites-preview start "$PWD"`, open `http://terminal.local:4173/` in the cloud browser, and verify the rendered app and its primary interactions. Keep that preview open and tell the user to inspect it in the cloud browser; do not present the local URL as a user-facing chat link. In Codex Desktop, run the local server yourself, open the preview in the in-app browser, and provide the clickable local URL. Do not deploy to Sites unless the user explicitly asks to share, publish, or deploy. Do not give the user server-start instructions when you can run it.
