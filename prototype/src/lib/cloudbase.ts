@@ -30,6 +30,9 @@ type VerifyEmailCode = (code: string) => Promise<WineAccount>;
 function authError(error: unknown, fallback: string) {
   if (error && typeof error === "object" && "message" in error) {
     const message = String(error.message);
+    if (/SignUpRequest\.Name|name.+regex pattern|invalid.+name/i.test(message)) {
+      return new Error("昵称需要为 2–48 个字符，请修改后重试");
+    }
     if (/provider\s+email\s+not\s+found|email.+provider.+not.+found/i.test(message)) {
       return new Error("CloudBase 尚未开启“邮箱验证码”登录方式，请先在控制台完成启用与发件邮箱配置");
     }
