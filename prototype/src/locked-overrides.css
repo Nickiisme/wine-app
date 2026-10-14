@@ -7,13 +7,27 @@
 }
 
 .wine-app .atlas-tabs {
-  position: sticky;
-  top: 0;
-  z-index: 16;
   box-sizing: border-box;
   background: rgba(251, 247, 239, .96);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+}
+
+.atlas-tabs-dock {
+  position: absolute;
+  z-index: 19;
+  top: 0;
+  left: 0;
+  right: 0;
+  box-sizing: border-box;
+  padding: 7px 22px 9px;
+  background: linear-gradient(180deg, #fbf7ef 78%, rgba(251, 247, 239, 0));
+}
+
+.wine-app .atlas-tabs-pinned {
+  height: 43px;
+  margin-top: 0;
+  box-shadow: 0 5px 14px rgba(74, 50, 42, .08);
 }
 
 .wine-app .explore-content::after,
