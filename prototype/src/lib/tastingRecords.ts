@@ -1,4 +1,5 @@
 const COLLECTION = "tasting_records";
+const PHOTO_BUCKET = "tasting-photos";
 
 async function getCloudbase() {
   return import("./cloudbase");
@@ -72,10 +73,31 @@ async function resolvePhotoUrls(records: CloudRecord[]) {
   const photoIds = [...new Set(records.flatMap((record) => record.photo_ids ?? []))];
   if (photoIds.length === 0) return new Map<string, string>();
   const { cloudbaseApp } = await getCloudbase();
-  const result = await cloudbaseApp.getTempFileURL({
-    fileList: photoIds.map((fileID) => ({ fileID, maxAge: 3600 })),
-  });
-  return new Map((result.fileList ?? []).filter((file) => file.tempFileURL).map((file) => [file.fileID, file.tempFileURL]));
+  const legacyFileIds = photoIds.filter((photoId) => photoId.startsWith("cloud://"));
+  const objectPaths = photoIds.filter((photoId) => !photoId.startsWith("cloud://"));
+  const urls = new Map<string, string>();
+
+  if (objectPaths.length > 0) {
+    const { data, error } = await cloudbaseApp.storage
+      .from(PHOTO_BUCKET)
+      .createSignedUrls(objectPaths, 3600);
+    if (error) throw error;
+    for (const item of data) {
+      if (item.fullSignedURL) urls.set(item.path, item.fullSignedURL);
+    }
+  }
+
+  // Keep records uploaded before the PG-storage migration readable.
+  if (legacyFileIds.length > 0) {
+    const result = await cloudbaseApp.getTempFileURL({
+      fileList: legacyFileIds.map((fileID) => ({ fileID, maxAge: 3600 })),
+    });
+    for (const file of result.fileList ?? []) {
+      if (file.tempFileURL) urls.set(file.fileID, file.tempFileURL);
+    }
+  }
+
+  return urls;
 }
 
 function fileExtension(file: File) {
@@ -87,12 +109,14 @@ function fileExtension(file: File) {
 async function uploadPhotos(files: File[], userId: string, recordId: string) {
   if (files.length === 0) return [];
   const { cloudbaseApp } = await getCloudbase();
+  const bucket = cloudbaseApp.storage.from(PHOTO_BUCKET);
   return Promise.all(files.map(async (file, index) => {
-    const result = await cloudbaseApp.uploadFile({
-      cloudPath: `tasting-records/${userId}/${recordId}/${index + 1}.${fileExtension(file)}`,
-      filePath: file,
+    const objectPath = `${userId}/${recordId}/${index + 1}.${fileExtension(file)}`;
+    const { data, error } = await bucket.upload(objectPath, file, {
+      contentType: file.type || undefined,
     });
-    return result.fileID;
+    if (error) throw error;
+    return data.path;
   }));
 }
 
