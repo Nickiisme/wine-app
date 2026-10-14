@@ -8,6 +8,7 @@ async function getCloudbase() {
 export type TastingRecord = {
   id: string;
   grape: string;
+  grapes?: string[];
   wine: string;
   year?: string;
   country?: string;
@@ -19,7 +20,72 @@ export type TastingRecord = {
   flavors?: string[];
   bodyLevel?: number;
   createdAt?: string;
+  fieldMetadata?: RecordFieldMetadata;
 };
+
+export type FieldSource = "user_selected" | "label_scan" | "inferred" | "default";
+export type FieldMetadata = { source: FieldSource; confirmed: boolean };
+export type RecordFieldMetadata = Partial<Record<"wine" | "year" | "grapes" | "country" | "region" | "preference" | "bodyLevel" | "flavors", FieldMetadata>>;
+export type RecordMode = "quick_save" | "tasting";
+
+export type FeedbackEvidence = {
+  mode: RecordMode;
+  confirmedPreference?: string;
+  confirmedBodyLevel?: number;
+  confirmedFlavors: string[];
+  hasUserNote: boolean;
+};
+
+export type SaveFeedback =
+  | { type: "collection"; title: string; description: string }
+  | { type: "personal"; title: string; description: string }
+  | { type: "knowledge"; title: string; description: string };
+
+export function isConfirmedUserField(record: TastingRecord, field: keyof RecordFieldMetadata) {
+  const metadata = record.fieldMetadata?.[field];
+  return metadata?.source === "user_selected" && metadata.confirmed === true;
+}
+
+export function getFeedbackEvidence(record: TastingRecord): FeedbackEvidence {
+  const confirmedPreference = isConfirmedUserField(record, "preference") ? record.preference : undefined;
+  const confirmedBodyLevel = isConfirmedUserField(record, "bodyLevel") ? record.bodyLevel : undefined;
+  const confirmedFlavors = isConfirmedUserField(record, "flavors") ? record.flavors ?? [] : [];
+  const hasUserNote = record.note.trim().length > 0;
+  const mode: RecordMode = confirmedPreference || confirmedBodyLevel !== undefined || confirmedFlavors.length > 0 || hasUserNote ? "tasting" : "quick_save";
+  return { mode, confirmedPreference, confirmedBodyLevel, confirmedFlavors, hasUserNote };
+}
+
+function buildPersonalDescription(evidence: FeedbackEvidence) {
+  const parts: string[] = [];
+  if (evidence.confirmedPreference) parts.push(`你觉得这杯酒“${evidence.confirmedPreference}”`);
+  if (evidence.confirmedFlavors.length > 0) parts.push(`感受到了${evidence.confirmedFlavors.slice(0, 3).join("、")}`);
+  if (evidence.confirmedBodyLevel !== undefined) {
+    parts.push(evidence.confirmedBodyLevel < 40 ? "口感偏轻盈" : evidence.confirmedBodyLevel > 65 ? "口感偏饱满" : "口感适中");
+  }
+  if (parts.length === 0 && evidence.hasUserNote) return "你写下了这杯酒的第一条品鉴感受。";
+  return `${parts.join("，")}。`;
+}
+
+export function buildSaveFeedback(record: TastingRecord): SaveFeedback {
+  const evidence = getFeedbackEvidence(record);
+  const grapeName = record.grapes?.find((grape) => grape && grape !== "不确定") || record.grape.split("、").find((grape) => grape && grape !== "不确定");
+  if (evidence.mode === "tasting") {
+    return { type: "personal", title: "记录了你的第一条口味线索", description: buildPersonalDescription(evidence) };
+  }
+  if (grapeName) {
+    return { type: "collection", title: `${grapeName}图鉴已点亮`, description: "第一杯已收藏。多记录几次真实感受后，我们会逐渐看见你的偏好。" };
+  }
+  return { type: "collection", title: "第一杯已收藏", description: "补充葡萄品种后，可以点亮对应图鉴。" };
+}
+
+export function buildKnowledgeFeedback(grapeName: string, typicalFlavors: string[]): SaveFeedback | null {
+  if (!grapeName || typicalFlavors.length === 0) return null;
+  return { type: "knowledge", title: "下次品尝时可以留意", description: `${grapeName}通常带有${typicalFlavors.slice(0, 2).join("、")}等香气。这不是你的口味结论，继续记录真实感受后再看看。` };
+}
+
+export function canSaveRecord(input: { wine: string; grapes: string[]; country: string; region: string; photoCount: number; preference: string | null; bodyLevel: number | null; flavors: string[]; note: string }) {
+  return Boolean(input.wine.trim() || input.grapes.length || input.country || input.region || input.photoCount || input.preference || input.bodyLevel !== null || input.flavors.length || input.note.trim());
+}
 
 export type NewTastingRecord = Omit<TastingRecord, "id" | "date"> & {
   tastedAt?: Date;
@@ -30,6 +96,7 @@ type CloudRecord = {
   id: string;
   user_id: string;
   grape: string;
+  grapes?: string[];
   wine_name: string;
   vintage?: string;
   country?: string;
@@ -41,6 +108,7 @@ type CloudRecord = {
   body_level?: number;
   tasted_at?: string;
   created_at?: string;
+  field_metadata?: RecordFieldMetadata;
 };
 
 function formatRecordDate(value?: string) {
@@ -55,6 +123,7 @@ function fromCloud(record: CloudRecord, photoUrls: string[] = []): TastingRecord
   return {
     id: record.id,
     grape: record.grape,
+    grapes: record.grapes ?? (record.grape ? record.grape.split("、").filter(Boolean) : []),
     wine: record.wine_name,
     year: record.vintage,
     country: record.country,
@@ -66,6 +135,7 @@ function fromCloud(record: CloudRecord, photoUrls: string[] = []): TastingRecord
     flavors: record.flavors,
     bodyLevel: record.body_level,
     createdAt: record.created_at,
+    fieldMetadata: record.field_metadata,
   };
 }
 
@@ -129,12 +199,27 @@ async function uploadPhotos(files: File[], userId: string, recordId: string) {
 export async function listTastingRecords(): Promise<TastingRecord[]> {
   const { ensureCloudbaseUser, getCloudbasePostgres } = await getCloudbase();
   const userId = await ensureCloudbaseUser();
-  const { data, error } = await getCloudbasePostgres()
+  const db = getCloudbasePostgres();
+  const extendedResult = await db
     .from(COLLECTION)
-    .select("id,user_id,grape,wine_name,vintage,country,region,photo_ids,note,preference,flavors,body_level,tasted_at,created_at")
+    .select("id,user_id,grape,grapes,wine_name,vintage,country,region,photo_ids,note,preference,flavors,body_level,field_metadata,tasted_at,created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(100);
+  let data: unknown[] | null = extendedResult.data;
+  let error = extendedResult.error;
+
+  // Remain readable before the optional metadata migration has been applied.
+  if (error && /grapes|field_metadata|column/i.test(String(error.message ?? error))) {
+    const legacyResult = await db
+      .from(COLLECTION)
+      .select("id,user_id,grape,wine_name,vintage,country,region,photo_ids,note,preference,flavors,body_level,tasted_at,created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    data = legacyResult.data;
+    error = legacyResult.error;
+  }
 
   if (error) throw error;
   const cloudRecords = (data ?? []) as CloudRecord[];
@@ -164,6 +249,7 @@ export async function createTastingRecord(
     id,
     user_id: userId,
     grape: record.grape,
+    grapes: record.grapes,
     wine_name: record.wine,
     vintage: record.year,
     country: record.country,
@@ -173,11 +259,17 @@ export async function createTastingRecord(
     preference: record.preference,
     flavors: record.flavors,
     body_level: record.bodyLevel,
+    field_metadata: record.fieldMetadata,
     tasted_at: tastedAt,
     created_at: createdAt,
     updated_at: createdAt,
   };
-  const { error } = await db.from(COLLECTION).insert(payload);
+  let { error } = await db.from(COLLECTION).insert(payload);
+
+  if (error && /grapes|field_metadata|column/i.test(String(error.message ?? error))) {
+    const { grapes: _grapes, field_metadata: _fieldMetadata, ...legacyPayload } = payload;
+    ({ error } = await db.from(COLLECTION).insert(legacyPayload));
+  }
 
   if (error) throw error;
   const photoUrls = await resolvePhotoUrls([payload]);

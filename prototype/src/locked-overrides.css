@@ -864,6 +864,11 @@
   white-space: nowrap;
 }
 
+.select-field.empty > strong > span { color: #a89b93; }
+.select-field > strong > span > small { display: block; margin-top: 2px; color: #a55c70; font-size: 8px; font-weight: 600; }
+.confirm-scan-action { width: 100%; min-height: 42px; margin: 12px 0 4px; border: 1px solid rgba(126, 22, 55, .18); border-radius: 14px; background: #fff9f4; color: #7e1637; display: flex; align-items: center; justify-content: center; gap: 7px; font-size: 12px; font-weight: 700; }
+.confirm-scan-action svg { width: 14px; height: 14px; }
+
 .select-field > strong > svg { flex: 0 0 auto; }
 
 .select-field svg { width: 15px; height: 15px; color: #8e817a; }
@@ -912,6 +917,21 @@
 .picker-options button span { line-height: 1.45; }
 .picker-options button svg { color: #7e1637; }
 .picker-empty { padding: 22px 0; color: #958983; text-align: center; font-size: 12px; }
+.multi-picker .picker-options { max-height: 330px; }
+.picker-done { width: 100%; min-height: 44px; margin-top: 12px; border: 0; border-radius: 14px; background: #7e1637; color: #fff; font-size: 13px; font-weight: 700; }
+
+.question-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.question-title > h2 { margin-bottom: 13px; }
+.question-title > span { color: #9b8c84; font-size: 9px; }
+.body-unrated { width: 100%; min-height: 44px; border: 1px dashed #d7c9bd; border-radius: 14px; background: rgba(255,255,255,.44); color: #8f8179; font-size: 12px; }
+.clear-rating { display: block; margin: 9px auto 0; border: 0; background: transparent; color: #9b8c84; font-size: 9px; }
+.preference-empty { margin: 0; color: #998c84; font-size: 11px; }
+.save-requirement { margin: 15px 0 0; color: #9a6d6d; font-size: 10px; line-height: 1.5; text-align: center; }
+.knowledge-insight { width: 100%; box-sizing: border-box; margin-top: 10px; padding: 14px 16px; border: 1px solid #ded7c6; border-radius: 17px; background: rgba(245, 244, 235, .78); text-align: left; }
+.knowledge-insight small { color: #73755e; font-size: 10px; letter-spacing: .6px; }
+.knowledge-insight p { margin: 7px 0 0; color: #655f53; font-size: 11px; line-height: 1.65; }
+.first-taste-insight.collection { background: #f4eee5; }
+.first-taste-insight.personal { background: #f2e7e9; }
 
 .share-content { padding-bottom: 70px; }
 

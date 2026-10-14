@@ -15,8 +15,10 @@ API Key. It uses CloudBase authentication and PostgreSQL RLS instead.
 6. Run `postgresql-storage.sql` in the same SQL editor. It creates the private
    `tasting-photos` bucket and allows both registered and anonymous app users to
    access only files under their own `{uid}/...` path.
+7. Run `postgresql-record-metadata.sql` to add multi-grape storage and the
+   per-field `source` / `confirmed` metadata used by preference calculations.
 
-Re-run both SQL files after pulling schema or policy changes. Committing or
+Re-run the relevant SQL files after pulling schema or policy changes. Committing or
 deploying the web client does not apply PostgreSQL RLS policies automatically.
 
 The client signs in anonymously and RLS compares each row's `user_id` with

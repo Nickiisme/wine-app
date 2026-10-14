@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ChangeEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type WheelEvent as ReactWheelEvent } from "react";
 import { ArrowLeftIcon, BookmarkFilledIcon, CameraIcon, CheckCircledIcon, CheckIcon, ChevronDownIcon, DrawingPinFilledIcon, GlobeIcon, ImageIcon, LayersIcon, Pencil2Icon, PersonIcon, PlusIcon, StarFilledIcon } from "@radix-ui/react-icons";
 import { BottomSheet, Carousel, KeyboardInput, KeyboardTextarea, MobileScroll, useKeyboard } from "./mobile";
-import { createTastingRecord, listTastingRecords, type TastingRecord } from "./lib/tastingRecords";
+import { buildKnowledgeFeedback, buildSaveFeedback, canSaveRecord, createTastingRecord, getFeedbackEvidence, listTastingRecords, type RecordFieldMetadata, type TastingRecord } from "./lib/tastingRecords";
+import { trackRecordEvent, type RecordAnalyticsProperties } from "./lib/analytics";
 import type { WineAccount } from "./lib/cloudbase";
 import "./locked-overrides.css";
 import "./onboarding.css";
@@ -11,7 +12,7 @@ type ExploreTab = "grapes" | "regions";
 type GrapeNode = { name: string; english: string; image: string; side: "left" | "right"; recent?: boolean; locked?: boolean };
 type GrapeDetail = { intro: string; taste: string; aromas: string[]; regions: string };
 type DraftPhoto = { id: string; preview: string; file: File; preparedFile: Promise<File> };
-type WineDraft = { wine: string; year: string; grape: string; country: string; region: string; photos: DraftPhoto[] };
+type WineDraft = { wine: string; year: string; grapes: string[]; country: string; region: string; photos: DraftPhoto[]; fieldMetadata: RecordFieldMetadata };
 type PickerOption = { value: string; label: string };
 const asset = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, "")}`;
 const getAccountApi = () => import("./lib/cloudbase");
@@ -22,6 +23,26 @@ const grapeDetails: Record<string, GrapeDetail> = {
   霞多丽: { intro: "可塑性很强的白葡萄品种，会随气候与酿造方式呈现不同面貌。", taste: "凉爽产区通常清爽高酸；温暖产区更饱满，橡木桶版本会有奶油质感。", aromas: ["柠檬", "青苹果", "桃子", "黄油", "烤面包"], regions: "法国勃艮第与香槟、美国加州、澳大利亚、智利" },
   长相思: { intro: "辨识度很高的芳香型白葡萄，气息清新而直接。", taste: "酒体轻盈，酸度高，入口爽脆；多数风格适合年轻时饮用。", aromas: ["青柠", "百香果", "青草", "接骨木花"], regions: "新西兰马尔堡、法国卢瓦尔河谷与波尔多、智利" },
 };
+
+type InputMethod = "camera" | "gallery" | "manual";
+
+function getRecordAnalyticsProperties(record: TastingRecord, inputMethod: InputMethod): RecordAnalyticsProperties {
+  const evidence = getFeedbackEvidence(record);
+  const grapeName = record.grapes?.find((grape) => grape && grape !== "不确定") || record.grape.split("、").find((grape) => grape && grape !== "不确定") || "";
+  const hasKnowledge = Boolean(grapeDetails[grapeName]?.aromas.length);
+  return {
+    record_mode: evidence.mode,
+    input_method: inputMethod,
+    has_photo: Boolean(record.photos?.length),
+    has_wine_name: Boolean(record.wine.trim() && record.wine !== "未命名酒款"),
+    has_confirmed_scan: Object.values(record.fieldMetadata ?? {}).some((metadata) => metadata?.source === "label_scan" && metadata.confirmed === true),
+    has_preference: Boolean(evidence.confirmedPreference),
+    has_body: evidence.confirmedBodyLevel !== undefined,
+    flavor_count: evidence.confirmedFlavors.length,
+    has_note: evidence.hasUserNote,
+    feedback_type: evidence.mode === "tasting" ? "personal" : hasKnowledge ? "knowledge" : "collection",
+  };
+}
 
 const grapeNodes: GrapeNode[] = [
   { name: "赤霞珠", english: "Cabernet Sauvignon", image: asset("assets/grapes/cabernet.webp"), side: "left" },
@@ -35,6 +56,13 @@ const grapeNodes: GrapeNode[] = [
   { name: "桑娇维塞", english: "Sangiovese", image: asset("assets/grapes/riesling.webp"), side: "left", locked: true },
 ];
 const flavors = ["草莓", "樱桃", "花香", "香草", "香料", "烟熏"];
+const bodyChoices = [
+  { label: "轻盈", value: 20 },
+  { label: "偏轻盈", value: 38 },
+  { label: "适中", value: 52 },
+  { label: "偏饱满", value: 70 },
+  { label: "饱满", value: 88 },
+];
 const bilingual = (value: string, english: string): PickerOption => ({ value, label: `${value} · ${english}` });
 const grapeOptions: PickerOption[] = [
   bilingual("赤霞珠", "Cabernet Sauvignon"), bilingual("梅洛", "Merlot"), bilingual("黑皮诺", "Pinot Noir"), bilingual("霞多丽", "Chardonnay"),
@@ -74,21 +102,11 @@ const regionOptionsByCountry: Record<string, PickerOption[]> = {
   日本: [bilingual("山梨", "Yamanashi"), bilingual("长野", "Nagano"), bilingual("北海道", "Hokkaido"), bilingual("山形", "Yamagata")],
   乌拉圭: [bilingual("卡内洛内斯", "Canelones"), bilingual("蒙得维的亚", "Montevideo"), bilingual("马尔多纳多", "Maldonado"), bilingual("科洛尼亚", "Colonia")],
 };
-const newDraft = (): WineDraft => ({ wine: "", year: String(new Date().getFullYear()), grape: "黑皮诺", country: "法国", region: "勃艮第", photos: [] });
+const newDraft = (): WineDraft => ({ wine: "", year: "", grapes: [], country: "", region: "", photos: [], fieldMetadata: {} });
 const ONBOARDING_SEEN_KEY = "wine-atlas:onboarding-seen";
 
 function rememberOnboarding() {
   window.localStorage.setItem(ONBOARDING_SEEN_KEY, "true");
-}
-
-function describeFirstTaste(record: TastingRecord) {
-  const body = typeof record.bodyLevel === "number" ? record.bodyLevel < 45 ? "偏清爽" : record.bodyLevel > 65 ? "偏浓郁" : "平衡适中" : "";
-  const flavors = (record.flavors ?? []).slice(0, 2).join("、");
-  const preference = record.preference === "喜欢" ? "你喜欢" : record.preference === "不喜欢" ? "你对" : "你觉得";
-  if (body && flavors) return `${preference}这杯${body}、带${flavors}气息的酒。`;
-  if (body) return `${preference}这杯${body}的酒。`;
-  if (flavors) return `${preference}这杯带${flavors}气息的酒。`;
-  return "这是你的第一条口味线索。再记录几杯，我们会逐渐看懂你的偏好。";
 }
 
 function suggestNextTaste(record: TastingRecord) {
@@ -174,10 +192,10 @@ export default function Prototype() {
   const [tab, setTab] = useState<ExploreTab>("grapes");
   const [recordSheet, setRecordSheet] = useState(false);
   const [recordFilter, setRecordFilter] = useState<string | null>(null);
-  const [liked, setLiked] = useState("喜欢");
-  const [selectedFlavors, setSelectedFlavors] = useState<string[]>(["草莓", "花香"]);
+  const [liked, setLiked] = useState<string | null>(null);
+  const [selectedFlavors, setSelectedFlavors] = useState<string[]>([]);
   const [tastingNote, setTastingNote] = useState("");
-  const [bodyLevel, setBodyLevel] = useState(58);
+  const [bodyLevel, setBodyLevel] = useState<number | null>(null);
   const [draft, setDraft] = useState<WineDraft>(newDraft);
   const [records, setRecords] = useState<TastingRecord[]>([]);
   const [recordsLoaded, setRecordsLoaded] = useState(false);
@@ -186,26 +204,30 @@ export default function Prototype() {
   const [cloudMessage, setCloudMessage] = useState<string | null>(null);
   const [account, setAccount] = useState<WineAccount | null>(null);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [inputMethod, setInputMethod] = useState<InputMethod>("manual");
   const cameraInput = useRef<HTMLInputElement>(null);
   const galleryInput = useRef<HTMLInputElement>(null);
   const noteCameraInput = useRef<HTMLInputElement>(null);
   const noteGalleryInput = useRef<HTMLInputElement>(null);
   const go = (next: Screen) => { keyboard.hide(); setScreen(next); };
-  const resetRecord = () => { setDraft((current) => { current.photos.forEach((photo) => URL.revokeObjectURL(photo.preview)); return newDraft(); }); setTastingNote(""); setLiked("喜欢"); setSelectedFlavors(["草莓", "花香"]); setBodyLevel(58); };
-  const startManualRecord = () => { setRecordSheet(false); resetRecord(); go("confirm"); };
+  const resetRecord = () => { setDraft((current) => { current.photos.forEach((photo) => URL.revokeObjectURL(photo.preview)); return newDraft(); }); setTastingNote(""); setLiked(null); setSelectedFlavors([]); setBodyLevel(null); };
+  const startManualRecord = () => { setInputMethod("manual"); setRecordSheet(false); resetRecord(); go("confirm"); };
   const openCamera = () => {
+    setInputMethod("camera");
     setRecordSheet(true);
     cameraInput.current?.click();
   };
   const openRecordChoices = () => setRecordSheet(true);
-  const openGallery = () => galleryInput.current?.click();
+  const openGallery = () => { setInputMethod("gallery"); galleryInput.current?.click(); };
   const useSelectedPhoto = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = "";
     if (!file) return;
     const photo = preparePhotos([file])[0];
     resetRecord();
-    setDraft((current) => ({ ...current, wine: "Domaine Belle Rivière", year: "2020", photos: [photo] }));
+    setDraft((current) => ({ ...current, wine: "Domaine Belle Rivière", year: "2020", grapes: ["黑皮诺"], country: "法国", region: "勃艮第", photos: [photo], fieldMetadata: {
+      wine: { source: "label_scan", confirmed: false }, year: { source: "label_scan", confirmed: false }, grapes: { source: "label_scan", confirmed: false }, country: { source: "label_scan", confirmed: false }, region: { source: "label_scan", confirmed: false },
+    } }));
     setRecordSheet(false);
     go("confirm");
   };
@@ -271,24 +293,59 @@ export default function Prototype() {
     setCloudMessage(null);
   };
 
+  const pendingRecord = (): TastingRecord => ({
+    id: "pending",
+    grape: draft.grapes.join("、"),
+    grapes: draft.grapes,
+    wine: draft.wine.trim(),
+    year: draft.year || undefined,
+    country: draft.country || undefined,
+    region: [draft.country, draft.region].filter(Boolean).join(" · "),
+    date: "",
+    note: tastingNote,
+    photos: draft.photos.map((photo) => photo.preview),
+    preference: liked ?? undefined,
+    flavors: selectedFlavors,
+    bodyLevel: bodyLevel ?? undefined,
+    fieldMetadata: {
+      ...draft.fieldMetadata,
+      preference: liked ? { source: "user_selected", confirmed: true } : undefined,
+      flavors: selectedFlavors.length ? { source: "user_selected", confirmed: true } : undefined,
+      bodyLevel: bodyLevel !== null ? { source: "user_selected", confirmed: true } : undefined,
+    },
+  });
+
+  const recordCanBeSaved = canSaveRecord({ wine: draft.wine, grapes: draft.grapes, country: draft.country, region: draft.region, photoCount: draft.photos.length, preference: liked, bodyLevel, flavors: selectedFlavors, note: tastingNote });
+
   const saveTasting = async () => {
+    if (!recordCanBeSaved) return;
+    const previewRecord = pendingRecord();
+    trackRecordEvent("record_save_clicked", getRecordAnalyticsProperties(previewRecord, inputMethod));
     setSavingRecord(true);
     setCloudMessage(null);
     try {
       const saved = await createTastingRecord({
-        grape: draft.grape,
-        wine: draft.wine.trim() || `${draft.region}${draft.grape}`,
-        year: draft.year,
-        country: draft.country,
+        grape: draft.grapes.join("、"),
+        grapes: draft.grapes,
+        wine: draft.wine.trim() || [draft.region, draft.grapes.join("、")].filter(Boolean).join(" ") || "未命名酒款",
+        year: draft.year || undefined,
+        country: draft.country || undefined,
         region: [draft.country, draft.region].filter(Boolean).join(" · "),
         note: tastingNote,
         photoFiles: await Promise.all(draft.photos.map((photo) => photo.preparedFile)),
-        preference: liked,
+        preference: liked ?? undefined,
         flavors: selectedFlavors,
-        bodyLevel,
+        bodyLevel: bodyLevel ?? undefined,
+        fieldMetadata: {
+          ...draft.fieldMetadata,
+          preference: liked ? { source: "user_selected", confirmed: true } : undefined,
+          flavors: selectedFlavors.length ? { source: "user_selected", confirmed: true } : undefined,
+          bodyLevel: bodyLevel !== null ? { source: "user_selected", confirmed: true } : undefined,
+        },
       });
       setRecords((current) => [saved, ...current]);
       setSavedRecord(saved);
+      trackRecordEvent("record_save_succeeded", getRecordAnalyticsProperties(saved, inputMethod));
       draft.photos.forEach((photo) => URL.revokeObjectURL(photo.preview));
       go("success");
     } catch (error) {
@@ -305,8 +362,8 @@ export default function Prototype() {
       {screen === "onboarding" && <OnboardingScreen onRecord={() => { rememberOnboarding(); go("explore"); openRecordChoices(); }} onExplore={() => { rememberOnboarding(); go("explore"); }} />}
       {screen === "explore" && <ExploreScreen tab={tab} records={records} recordsLoaded={recordsLoaded} account={account} onTab={setTab} onRecord={openRecordChoices} onProfile={() => go("profile")} onNotes={(grape) => { setRecordFilter(grape); go("records"); }} />}
       {screen === "confirm" && <ConfirmScreen draft={draft} onChange={setDraft} onBack={() => go("explore")} onNext={() => go("taste")} />}
-      {screen === "taste" && <TasteScreen liked={liked} setLiked={setLiked} selectedFlavors={selectedFlavors} toggleFlavor={(flavor) => setSelectedFlavors((current) => current.includes(flavor) ? current.filter((item) => item !== flavor) : [...current, flavor])} note={tastingNote} onNoteChange={setTastingNote} bodyLevel={bodyLevel} onBodyLevel={setBodyLevel} photos={draft.photos} onCamera={() => noteCameraInput.current?.click()} onGallery={() => noteGalleryInput.current?.click()} onRemovePhoto={(id) => setDraft((current) => { const removed = current.photos.find((photo) => photo.id === id); if (removed) URL.revokeObjectURL(removed.preview); return { ...current, photos: current.photos.filter((photo) => photo.id !== id) }; })} onBack={() => go("confirm")} onSave={saveTasting} saving={savingRecord} cloudMessage={cloudMessage} />}
-      {screen === "success" && <SuccessScreen record={savedRecord} recordCount={records.length} isGuest={!account || account.isAnonymous} onDone={() => go("explore")} onSync={() => { setAuthMode("register"); go("auth"); }} />}
+      {screen === "taste" && <TasteScreen liked={liked} setLiked={setLiked} selectedFlavors={selectedFlavors} toggleFlavor={(flavor) => setSelectedFlavors((current) => current.includes(flavor) ? current.filter((item) => item !== flavor) : [...current, flavor])} note={tastingNote} onNoteChange={setTastingNote} bodyLevel={bodyLevel} onBodyLevel={setBodyLevel} photos={draft.photos} onCamera={() => noteCameraInput.current?.click()} onGallery={() => noteGalleryInput.current?.click()} onRemovePhoto={(id) => setDraft((current) => { const removed = current.photos.find((photo) => photo.id === id); if (removed) URL.revokeObjectURL(removed.preview); return { ...current, photos: current.photos.filter((photo) => photo.id !== id) }; })} onBack={() => go("confirm")} onSave={saveTasting} canSave={recordCanBeSaved} saving={savingRecord} cloudMessage={cloudMessage} />}
+      {screen === "success" && <SuccessScreen record={savedRecord} recordCount={records.length} firstTaste={Boolean(savedRecord && getFeedbackEvidence(savedRecord).mode === "tasting" && records.filter((record) => getFeedbackEvidence(record).mode === "tasting").length === 1)} inputMethod={inputMethod} isGuest={!account || account.isAnonymous} onDone={() => go("explore")} onSync={() => { setAuthMode("register"); go("auth"); }} />}
       {screen === "profile" && <ProfileScreen records={records} account={account} onExplore={() => go("explore")} onRecord={openCamera} onRecords={() => { setRecordFilter(null); go("records"); }} onFlavor={() => go("flavor")} onShare={() => go("share")} onSettings={() => go("settings")} />}
       {screen === "records" && <TastingRecordsScreen grape={recordFilter} records={records} cloudMessage={cloudMessage} onBack={() => go(recordFilter ? "explore" : "profile")} />}
       {screen === "flavor" && <FlavorPreferenceScreen records={records} onBack={() => go("profile")} />}
@@ -342,6 +399,7 @@ function AtlasTabs({ tab, onTab, pinned = false, inactive = false }: { tab: Expl
 function ExploreScreen({ tab, records, recordsLoaded, account, onTab, onRecord, onProfile, onNotes }: { tab: ExploreTab; records: TastingRecord[]; recordsLoaded: boolean; account: WineAccount | null; onTab: (tab: ExploreTab) => void; onRecord: () => void; onProfile: () => void; onNotes: (grape: string) => void }) {
   const [selectedGrape, setSelectedGrape] = useState<GrapeNode | null>(null);
   const [tabsPinned, setTabsPinned] = useState(false);
+  const [dismissedPrompt, setDismissedPrompt] = useState<"empty" | "first" | null>(null);
   const contentRef = useRef<HTMLElement>(null);
   const tabsAnchorRef = useRef<HTMLDivElement>(null);
   const detail = selectedGrape ? grapeDetails[selectedGrape.name] : null;
@@ -350,6 +408,8 @@ function ExploreScreen({ tab, records, recordsLoaded, account, onTab, onRecord, 
   const selectedLocked = selectedCount === 0;
   const hasNoRecords = recordsLoaded && stats.recordCount === 0;
   const hasFirstRecord = stats.recordCount === 1;
+  const promptKind = hasNoRecords ? "empty" : hasFirstRecord ? "first" : null;
+  const promptOpen = promptKind !== null && dismissedPrompt !== promptKind;
   const greeting = hasNoRecords ? "你的葡萄酒世界，从第一杯开始" : hasFirstRecord ? "你的葡萄酒世界已经点亮" : account && !account.isAnonymous ? `晚上好，${account.name} 🍷` : "晚上好 🍷";
   useEffect(() => {
     const scroll = contentRef.current?.closest(".mobile-scroll");
@@ -364,14 +424,15 @@ function ExploreScreen({ tab, records, recordsLoaded, account, onTab, onRecord, 
     <MobileScroll className={`app-scroll paper-screen ${tab === "regions" ? "region-page" : ""}`}>
       <main ref={contentRef} className={`explore-content ${tab === "regions" ? "region-explore-content" : ""}`}>
         <header className={`welcome ${hasNoRecords ? "empty-welcome" : ""}`}><p className="eyebrow">{greeting}</p><h1>{hasNoRecords ? "每记录一种葡萄，它就会在这里被点亮。" : "你的葡萄酒世界已点亮："}</h1><p className="stats"><strong>{stats.grapeCount}</strong> 个品种 <i>·</i> <strong>{stats.regionCount}</strong> 个产区 <i>·</i> <strong>{stats.recordCount}</strong> 次品鉴</p></header>
-        {hasNoRecords && <section className="first-record-card"><span><CameraIcon /></span><div><strong>点亮第一个品种</strong><p>不知道是什么葡萄？拍下酒标，我们帮你填写。</p></div><button onClick={onRecord}>开始记录</button></section>}
-        {hasFirstRecord && <section className="first-insight-card"><small>下一杯探索</small><p>{suggestNextTaste(records[0])}</p><button onClick={onRecord}>遇到下一杯时，继续记下来 <span>›</span></button></section>}
         <div ref={tabsAnchorRef}><AtlasTabs tab={tab} onTab={onTab} inactive={tabsPinned} /></div>
         {tab === "grapes" ? <GrapeAtlas records={records} onSelect={setSelectedGrape} /> : <RegionMap records={records} />}
       </main>
     </MobileScroll>
     {tabsPinned && <div className="atlas-tabs-dock"><AtlasTabs tab={tab} onTab={onTab} pinned /></div>}
     <BottomNav active="explore" onExplore={() => onTab(tab)} onRecord={onRecord} onProfile={onProfile} />
+    <BottomSheet open={promptOpen} onOpenChange={(open) => { if (!open && promptKind) setDismissedPrompt(promptKind); }} title={promptKind === "empty" ? "点亮第一个品种" : "下一杯探索"} description={promptKind === "empty" ? "从一杯酒开始，慢慢建立属于你的葡萄图鉴" : "根据你的第一条品鉴记录，为你准备了一点灵感"} snap={0.4}>
+      {promptKind && <div className="explore-prompt"><span className="explore-prompt-icon">{promptKind === "empty" ? <CameraIcon /> : "✦"}</span><p>{promptKind === "empty" ? "不知道是什么葡萄也没关系。拍下酒标，我们会帮你填写品种与产区。" : suggestNextTaste(records[0])}</p><button className="primary-action" onClick={() => { setDismissedPrompt(promptKind); onRecord(); }}>{promptKind === "empty" ? "开始记录" : "遇到下一杯时，继续记下来"}</button><button className="text-action" onClick={() => setDismissedPrompt(promptKind)}>稍后再说</button></div>}
+    </BottomSheet>
     <BottomSheet open={!!selectedGrape} onOpenChange={(open) => { if (!open) setSelectedGrape(null); }} title={selectedGrape?.name ?? "品种介绍"} description={selectedGrape?.english} snap={0.7}>
       {selectedGrape && (selectedLocked ? <div className="grape-detail locked-detail"><span className="detail-question">?</span><h3>{selectedGrape.name}</h3><p>这是一个待探索品种。第一次记录它时，就会在图鉴中点亮。</p></div> : <div className="grape-detail"><div className="grape-detail-hero"><img src={selectedGrape.image} alt={`${selectedGrape.name}葡萄简笔画`} draggable={false} /><div><span className="detail-count">已品鉴 {formatCount(selectedCount)} 次</span><p>{detail?.intro}</p></div></div><section className="detail-section"><small>喝起来</small><p>{detail?.taste}</p></section><section className="detail-section"><small>常见香气</small><div className="aroma-tags">{detail?.aromas.map((aroma) => <span key={aroma}>{aroma}</span>)}</div></section><section className="detail-section"><small>主要产地</small><p>{detail?.regions}</p></section><button className="notes-link" onClick={() => onNotes(selectedGrape.name)}>查看 {selectedCount} 条品酒笔记 <span>›</span></button></div>)}
     </BottomSheet>
@@ -381,7 +442,7 @@ function ExploreScreen({ tab, records, recordsLoaded, account, onTab, onRecord, 
 function GrapeAtlas({ records, onSelect }: { records: TastingRecord[]; onSelect: (grape: GrapeNode) => void }) {
   const [pressed, setPressed] = useState<string | null>(null);
   const counts = getRecordStats(records).grapeCounts;
-  const latestGrape = records[0]?.grape;
+  const latestGrape = records[0]?.grapes?.[0] ?? records[0]?.grape.split("、")[0];
   const choose = (grape: GrapeNode) => { setPressed(grape.name); window.setTimeout(() => { setPressed(null); onSelect(grape); }, 190); };
   return <section className="grape-atlas" aria-label="葡萄品种探索路径"><svg className="path-line" viewBox="0 0 180 940" preserveAspectRatio="none" aria-hidden="true"><path d="M88 4 C158 72 154 150 86 220 S18 365 92 438 S156 580 82 650 S20 794 92 936" /></svg>{grapeNodes.map((grape, index) => { const count = counts[grape.name] ?? 0; const locked = count === 0; const recent = grape.name === latestGrape; return <button key={`${grape.name}-${index}`} onClick={() => choose(grape)} className={`grape-node ${grape.side} ${locked ? "locked" : ""} ${recent ? "recent" : ""} ${pressed === grape.name ? "pressed" : ""}`} aria-label={`${grape.name}${locked ? "，待探索" : `，品鉴过${count}次`}`}><span className="grape-art-wrap"><img src={grape.image} alt="" draggable={false} loading={index < 3 ? "eager" : "lazy"} decoding="async" fetchPriority={index < 2 ? "high" : "auto"} />{!locked && <span className="taste-count">{formatCount(count)}</span>}{recent && <span className="recent-spark">✦</span>}{locked && <span className="locked-mark">?</span>}</span><strong>{grape.name}</strong><small>{locked ? `${grape.english} · 待探索` : grape.english}</small></button>; })}</section>;
 }
@@ -393,7 +454,8 @@ function getRecordStats(records: TastingRecord[]) {
   const regions = new Set<string>();
   const countries = new Set<string>();
   records.forEach((record) => {
-    if (record.grape) grapeCounts[record.grape] = (grapeCounts[record.grape] ?? 0) + 1;
+    const recordGrapes = (record.grapes ?? record.grape.split("、")).filter((grape) => grape && grape !== "不确定");
+    recordGrapes.forEach((grape) => { grapeCounts[grape] = (grapeCounts[grape] ?? 0) + 1; });
     if (record.region) {
       regions.add(record.region);
       countries.add(record.region.split("·")[0].trim());
@@ -485,22 +547,35 @@ function RegionMap({ records }: { records: TastingRecord[] }) {
 
 function ConfirmScreen({ draft, onChange, onBack, onNext }: { draft: WineDraft; onChange: (draft: WineDraft) => void; onBack: () => void; onNext: () => void }) {
   const [picker, setPicker] = useState<"year" | "grape" | "country" | "region" | null>(null);
-  const years = Array.from({ length: 61 }, (_, index) => { const value = String(new Date().getFullYear() - index); return { value, label: value }; });
+  const years = [{ value: "NV", label: "无年份 NV" }, { value: "不确定", label: "不确定" }, ...Array.from({ length: 61 }, (_, index) => { const value = String(new Date().getFullYear() - index); return { value, label: value }; })];
   const update = (value: Partial<WineDraft>) => onChange({ ...draft, ...value });
+  const selectField = (key: "year" | "country" | "region", value: string, extra: Partial<WineDraft> = {}) => update({ ...extra, [key]: value, fieldMetadata: { ...draft.fieldMetadata, [key]: { source: "user_selected", confirmed: true } } });
   const pickerConfig = picker ? {
-    year: { title: "选择年份", options: years, value: draft.year, searchable: false, onSelect: (value: string) => update({ year: value }) },
-    grape: { title: "选择葡萄品种", options: grapeOptions, value: draft.grape, searchable: true, onSelect: (value: string) => update({ grape: value }) },
-    country: { title: "选择国家", options: countryOptions, value: draft.country, searchable: true, onSelect: (value: string) => update({ country: value, region: regionOptionsByCountry[value]?.[0]?.value ?? "" }) },
-    region: { title: "选择产区", options: regionOptionsByCountry[draft.country] ?? [], value: draft.region, searchable: true, onSelect: (value: string) => update({ region: value }) },
+    year: { title: "选择年份", options: years, value: draft.year, searchable: false, onSelect: (value: string) => selectField("year", value) },
+    grape: null,
+    country: { title: "选择国家", options: countryOptions, value: draft.country, searchable: true, onSelect: (value: string) => update({ country: value, region: "", fieldMetadata: { ...draft.fieldMetadata, country: { source: "user_selected", confirmed: true }, region: undefined } }) },
+    region: { title: "选择产区", options: regionOptionsByCountry[draft.country] ?? [], value: draft.region, searchable: true, onSelect: (value: string) => selectField("region", value) },
   }[picker] : null;
   const firstPhoto = draft.photos[0]?.preview;
   const displayValue = (options: PickerOption[], value: string) => options.find((option) => option.value === value)?.label ?? value;
-  return <><MobileScroll className="app-scroll paper-screen"><main className="flow-content"><FlowHeader title="确认酒款" onBack={onBack} />{firstPhoto && <div className="label-photo has-photo"><img src={firstPhoto} alt="刚刚拍摄的酒标" /><div><strong>{draft.wine || "待确认酒款"}</strong><span>{displayValue(grapeOptions, draft.grape)} · {draft.year}</span></div><span className="scan-pill"><CheckIcon /> 已识别</span></div>}<p className="helper-copy">{firstPhoto ? "请确认识别结果，点按任意字段即可修改。" : "手动填写酒款信息；只有酒款名称会唤起键盘。"}</p><div className="form-list"><Field label="酒款名称" value={draft.wine} onChange={(wine) => update({ wine })} /><SelectField label="年份" value={draft.year} onClick={() => setPicker("year")} /><SelectField label="葡萄品种" value={displayValue(grapeOptions, draft.grape)} onClick={() => setPicker("grape")} /><SelectField label="国家" value={displayValue(countryOptions, draft.country)} onClick={() => setPicker("country")} /><SelectField label="产区" value={displayValue(regionOptionsByCountry[draft.country] ?? [], draft.region)} onClick={() => setPicker("region")} /></div><button className="primary-action" onClick={onNext}>确认，继续</button></main></MobileScroll>{pickerConfig && <OptionPicker open={!!picker} onOpenChange={(open) => { if (!open) setPicker(null); }} title={pickerConfig.title} options={pickerConfig.options} value={pickerConfig.value} searchable={pickerConfig.searchable} onSelect={(value) => { pickerConfig.onSelect(value); setPicker(null); }} />}</>;
+  const unconfirmed = Object.values(draft.fieldMetadata).some((meta) => meta?.confirmed === false);
+  const confirmScanned = () => onChange({ ...draft, fieldMetadata: Object.fromEntries(Object.entries(draft.fieldMetadata).map(([key, meta]) => [key, meta ? { ...meta, confirmed: true } : meta])) });
+  const sourceNote = (key: keyof RecordFieldMetadata) => draft.fieldMetadata[key]?.confirmed === false ? "酒标识别 · 待确认" : undefined;
+  return <><MobileScroll className="app-scroll paper-screen"><main className="flow-content"><FlowHeader title="确认酒款" onBack={onBack} />{firstPhoto && <div className="label-photo has-photo"><img src={firstPhoto} alt="刚刚拍摄的酒标" /><div><strong>{draft.wine || "待确认酒款"}</strong><span>{draft.grapes.map((value) => displayValue(grapeOptions, value)).join("、") || "葡萄品种未填写"}{draft.year ? ` · ${draft.year}` : ""}</span></div><span className="scan-pill">识别结果</span></div>}<p className="helper-copy">{firstPhoto ? "酒标识别内容会先标为待确认，确认后才用于你的口味画像。" : "所有信息默认留空；不确定的内容可以直接标记。"}</p><div className="form-list"><Field label="酒款名称" value={draft.wine} onChange={(wine) => update({ wine, fieldMetadata: { ...draft.fieldMetadata, wine: { source: "user_selected", confirmed: true } } })} /><SelectField label="年份" value={draft.year ? displayValue(years, draft.year) : "未填写"} note={sourceNote("year")} empty={!draft.year} onClick={() => setPicker("year")} /><SelectField label="葡萄品种" value={draft.grapes.length ? draft.grapes.map((value) => displayValue(grapeOptions, value)).join("、") : "未填写"} note={sourceNote("grapes")} empty={!draft.grapes.length} onClick={() => setPicker("grape")} /><SelectField label="国家" value={draft.country ? displayValue(countryOptions, draft.country) : "未填写"} note={sourceNote("country")} empty={!draft.country} onClick={() => setPicker("country")} /><SelectField label="产区" value={draft.region ? displayValue(regionOptionsByCountry[draft.country] ?? [], draft.region) : "未填写"} note={sourceNote("region")} empty={!draft.region} onClick={() => setPicker("region")} /></div>{unconfirmed && <button className="confirm-scan-action" onClick={confirmScanned}><CheckIcon />确认以上酒标识别结果</button>}<button className="primary-action" onClick={onNext}>继续写品酒感受</button></main></MobileScroll>{picker === "grape" && <MultiOptionPicker open onOpenChange={(open) => { if (!open) setPicker(null); }} title="选择葡萄品种" options={[{ value: "不确定", label: "不确定" }, ...grapeOptions]} values={draft.grapes} onDone={(grapes) => { update({ grapes, fieldMetadata: { ...draft.fieldMetadata, grapes: { source: "user_selected", confirmed: true } } }); setPicker(null); }} />}{pickerConfig && <OptionPicker open={!!picker} onOpenChange={(open) => { if (!open) setPicker(null); }} title={pickerConfig.title} options={pickerConfig.options} value={pickerConfig.value} searchable={pickerConfig.searchable} onSelect={(value) => { pickerConfig.onSelect(value); setPicker(null); }} />}</>;
 }
 
 function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <label className="field-row"><span>{label}</span><input value={value} onChange={(event) => onChange(event.currentTarget.value)} placeholder="请输入酒款名称" aria-label={label} /></label>; }
 
-function SelectField({ label, value, onClick }: { label: string; value: string; onClick: () => void }) { return <button className="field-row select-field" onClick={onClick} aria-label={`${label}，当前为${value}`}><span>{label}</span><strong><span>{value}</span><ChevronDownIcon /></strong></button>; }
+function SelectField({ label, value, note, empty, onClick }: { label: string; value: string; note?: string; empty?: boolean; onClick: () => void }) { return <button className={`field-row select-field ${empty ? "empty" : ""}`} onClick={onClick} aria-label={`${label}，当前为${value}`}><span>{label}</span><strong><span>{value}{note && <small>{note}</small>}</span><ChevronDownIcon /></strong></button>; }
+
+function MultiOptionPicker({ open, onOpenChange, title, options, values, onDone }: { open: boolean; onOpenChange: (open: boolean) => void; title: string; options: PickerOption[]; values: string[]; onDone: (values: string[]) => void }) {
+  const [selected, setSelected] = useState(values);
+  const [query, setQuery] = useState("");
+  useEffect(() => { if (open) { setSelected(values); setQuery(""); } }, [open, values]);
+  const visibleOptions = options.filter((option) => `${option.value} ${option.label}`.toLowerCase().includes(query.trim().toLowerCase()));
+  const toggle = (value: string) => setSelected((current) => value === "不确定" ? (current.includes(value) ? [] : [value]) : (current.includes(value) ? current.filter((item) => item !== value) : [...current.filter((item) => item !== "不确定"), value]));
+  return <BottomSheet open={open} onOpenChange={onOpenChange} title={title} description="可多选；支持中文或英文搜索" snap={0.76}><div className="option-picker multi-picker" tabIndex={0} aria-label="葡萄品种选项"><div className="picker-search"><KeyboardInput value={query} onChange={(event) => setQuery(event.currentTarget.value)} placeholder="搜索葡萄品种" aria-label="搜索葡萄品种" /></div><div className="picker-options">{visibleOptions.map((option) => <button className={selected.includes(option.value) ? "selected" : ""} onClick={() => toggle(option.value)} key={option.value}><span>{option.label}</span>{selected.includes(option.value) && <CheckIcon />}</button>)}</div><button className="picker-done" onClick={() => onDone(selected)}>完成{selected.length ? `（已选 ${selected.length}）` : ""}</button></div></BottomSheet>;
+}
 
 function OptionPicker({ open, onOpenChange, title, options, value, searchable, onSelect }: { open: boolean; onOpenChange: (open: boolean) => void; title: string; options: PickerOption[]; value: string; searchable: boolean; onSelect: (value: string) => void }) {
   const [query, setQuery] = useState("");
@@ -510,15 +585,81 @@ function OptionPicker({ open, onOpenChange, title, options, value, searchable, o
   return <BottomSheet open={open} onOpenChange={onOpenChange} title={title} description={searchable ? "支持中文或英文搜索，常用品项优先" : "选择酒标上的年份"} snap={0.68}><div className="option-picker" tabIndex={0} aria-label={`${title}选项`}>{searchable && <div className="picker-search"><KeyboardInput value={query} onChange={(event) => setQuery(event.currentTarget.value)} placeholder={`搜索${title.replace("选择", "")}`} aria-label={`搜索${title.replace("选择", "")}`} /></div>}<div className="picker-options">{visibleOptions.map((option) => <button className={option.value === value ? "selected" : ""} onClick={() => onSelect(option.value)} key={option.value}><span>{option.label}</span>{option.value === value && <CheckIcon />}</button>)}{visibleOptions.length === 0 && <p className="picker-empty">没有找到相关选项</p>}</div></div></BottomSheet>;
 }
 
-function TasteScreen({ liked, setLiked, selectedFlavors, toggleFlavor, note, onNoteChange, bodyLevel, onBodyLevel, photos, onCamera, onGallery, onRemovePhoto, onBack, onSave, saving, cloudMessage }: { liked: string; setLiked: (liked: string) => void; selectedFlavors: string[]; toggleFlavor: (flavor: string) => void; note: string; onNoteChange: (note: string) => void; bodyLevel: number; onBodyLevel: (value: number) => void; photos: DraftPhoto[]; onCamera: () => void; onGallery: () => void; onRemovePhoto: (id: string) => void; onBack: () => void; onSave: () => Promise<void>; saving: boolean; cloudMessage: string | null }) {
-  return <MobileScroll className="app-scroll paper-screen"><main className="flow-content taste-content"><FlowHeader title="你的感受" onBack={onBack} /><section className="question-block"><h2>你喜欢这杯酒吗？</h2><div className="choice-row">{["不喜欢", "还不错", "喜欢"].map((option) => <button className={liked === option ? "selected" : ""} onClick={() => setLiked(option)} key={option}>{option}</button>)}</div></section><section className="question-block"><h2>喝起来更接近？</h2><div className="range-copy"><span>清爽</span><span>浓郁</span></div><input className="taste-range" type="range" min="0" max="100" value={bodyLevel} onChange={(event) => onBodyLevel(Number(event.currentTarget.value))} aria-label="清爽到浓郁" /></section><section className="question-block"><h2>你感受到了什么？</h2><div className="flavor-grid">{flavors.map((flavor) => <button className={selectedFlavors.includes(flavor) ? "selected" : ""} onClick={() => toggleFlavor(flavor)} key={flavor}>{flavor}</button>)}</div></section><section className="question-block note-block"><div className="note-heading"><h2>想记下什么？ <span>选填</span></h2><small>{note.length}/1000</small></div><KeyboardTextarea value={note} maxLength={1000} rows={5} aria-label="品酒笔记" placeholder="可以写下香气、口感、搭配的食物，或者此刻的心情……" onChange={(event) => { onNoteChange(event.currentTarget.value); event.currentTarget.style.height = "auto"; event.currentTarget.style.height = `${event.currentTarget.scrollHeight + 2}px`; }} /><div className="note-photos">{photos.map((photo, index) => <figure key={photo.id}><img src={photo.preview} alt={`品鉴照片 ${index + 1}`} /><button onClick={() => onRemovePhoto(photo.id)} aria-label={`移除第${index + 1}张照片`}>×</button>{index === 0 && <figcaption>首图</figcaption>}</figure>)}{photos.length < 9 && <button className="add-note-photo" onClick={onCamera}><CameraIcon /><span>继续拍照</span></button>}</div><button className="upload-note-photo" onClick={onGallery}><ImageIcon /> 从相册上传{photos.length > 0 ? "更多照片" : "照片"}</button><small className="photo-help">最多 9 张；酒标识别照片会自动排在第一张。</small></section>{cloudMessage && <p className="helper-copy" role="status">{cloudMessage}</p>}<button className="primary-action" onClick={() => void onSave()} disabled={saving}>{saving ? "正在上传并保存…" : "保存记录"}</button></main></MobileScroll>;
+function TasteScreen({ liked, setLiked, selectedFlavors, toggleFlavor, note, onNoteChange, bodyLevel, onBodyLevel, photos, onCamera, onGallery, onRemovePhoto, onBack, onSave, canSave, saving, cloudMessage }: { liked: string | null; setLiked: (liked: string | null) => void; selectedFlavors: string[]; toggleFlavor: (flavor: string) => void; note: string; onNoteChange: (note: string) => void; bodyLevel: number | null; onBodyLevel: (value: number | null) => void; photos: DraftPhoto[]; onCamera: () => void; onGallery: () => void; onRemovePhoto: (id: string) => void; onBack: () => void; onSave: () => Promise<void>; canSave: boolean; saving: boolean; cloudMessage: string | null }) {
+  const selectedBody = bodyChoices.find((choice) => choice.value === bodyLevel);
+  return <MobileScroll className="app-scroll paper-screen"><main className="flow-content taste-content">
+    <FlowHeader title="你的感受" onBack={onBack} />
+    <section className="question-block"><div className="question-title"><h2>你喜欢这杯酒吗？</h2><span>{liked ?? "未评价"}</span></div>
+      <div className="choice-row taste-choice-row">{["不喜欢", "还不错", "喜欢"].map((option) => <button aria-pressed={liked === option} className={liked === option ? "selected" : ""} onClick={() => setLiked(liked === option ? null : option)} key={option}>{option}</button>)}</div>
+    </section>
+    <section className="question-block"><div className="question-title"><h2>喝起来更接近？</h2><span>{selectedBody?.label ?? "未评价"}</span></div>
+      <div className="body-choice-row" role="group" aria-label="酒体感受">{bodyChoices.map((choice) => <button key={choice.value} aria-pressed={bodyLevel === choice.value} className={bodyLevel === choice.value ? "selected" : ""} onClick={() => onBodyLevel(bodyLevel === choice.value ? null : choice.value)}>{choice.label}</button>)}</div>
+      <div className="body-choice-scale" aria-hidden="true"><span>清爽</span><span>浓郁</span></div>
+    </section>
+    <section className="question-block"><div className="question-title"><h2>你感受到了什么？</h2><span>{selectedFlavors.length ? `已选 ${selectedFlavors.length}` : "未选择"}</span></div>
+      <div className="flavor-grid taste-flavor-grid">{flavors.map((flavor) => <button aria-pressed={selectedFlavors.includes(flavor)} className={selectedFlavors.includes(flavor) ? "selected" : ""} onClick={() => toggleFlavor(flavor)} key={flavor}>{flavor}</button>)}</div>
+    </section>
+    <section className="question-block note-block"><div className="note-heading"><h2>想记下什么？ <span>选填</span></h2><small>{note.length}/1000</small></div>
+      <KeyboardTextarea value={note} maxLength={1000} rows={5} aria-label="品酒笔记" placeholder="可以写下香气、口感、搭配的食物，或者此刻的心情……" onChange={(event) => { onNoteChange(event.currentTarget.value); event.currentTarget.style.height = "auto"; event.currentTarget.style.height = `${event.currentTarget.scrollHeight + 2}px`; }} />
+      <div className="note-photos">{photos.map((photo, index) => <figure key={photo.id}><img src={photo.preview} alt={`品鉴照片 ${index + 1}`} /><button onClick={() => onRemovePhoto(photo.id)} aria-label={`移除第${index + 1}张照片`}>×</button>{index === 0 && <figcaption>首图</figcaption>}</figure>)}{photos.length < 9 && <button className="add-note-photo" onClick={onCamera}><CameraIcon /><span>继续拍照</span></button>}</div>
+      <button className="upload-note-photo" onClick={onGallery}><ImageIcon /> 从相册上传{photos.length > 0 ? "更多照片" : "照片"}</button><small className="photo-help">最多 9 张；酒标识别照片会自动排在第一张。</small>
+    </section>
+    {!canSave && <p className="save-requirement" role="status">至少添加一张照片、酒款信息或品鉴感受。</p>}{cloudMessage && <p className="helper-copy" role="status">{cloudMessage}</p>}
+    <button className="primary-action" onClick={() => void onSave()} disabled={saving || !canSave}>{saving ? "正在上传并保存…" : "保存记录"}</button>
+  </main></MobileScroll>;
 }
 
-function SuccessScreen({ record, recordCount, isGuest, onDone, onSync }: { record: TastingRecord | null; recordCount: number; isGuest: boolean; onDone: () => void; onSync: () => void }) {
-  const grape = record?.grape ?? "新的葡萄品种";
+function SuccessScreen({ record, recordCount, firstTaste, inputMethod, isGuest, onDone, onSync }: { record: TastingRecord | null; recordCount: number; firstTaste: boolean; inputMethod: InputMethod; isGuest: boolean; onDone: () => void; onSync: () => void }) {
+  const trackedRecord = useRef<string | null>(null);
+  const grape = record?.grapes?.find((item) => item !== "不确定") || record?.grape.split("、").find((item) => item && item !== "不确定") || "";
   const grapeNode = grapeNodes.find((item) => item.name === grape);
-  const firstRecord = recordCount === 1 && record;
-  return <MobileScroll className="app-scroll paper-screen"><main className={`success-content ${firstRecord ? "first-success" : ""}`}><span className="success-kicker">{firstRecord ? "第一杯已经收进你的图鉴" : "品鉴记录已保存"}</span>{grapeNode && <img className="success-grape" src={grapeNode.image} alt={`${grape}葡萄插画`} draggable={false} decoding="async" />}<h1>{firstRecord ? `你点亮了「${grape}」` : grape}</h1><p>{grapeNode?.english ?? "新的葡萄品种"}</p>{firstRecord ? <><div className="first-taste-insight"><small>第一条口味线索</small><p>{describeFirstTaste(record)}</p></div><div className="first-badge"><span><CheckCircledIcon /></span><div><small>获得纪念徽章</small><strong>初次举杯</strong></div></div></> : <div className="unlock-summary"><CheckIcon /><span>这次品鉴已经加入你的葡萄酒世界</span></div>}<button className="primary-action" onClick={onDone}>回到我的图鉴</button>{firstRecord && isGuest && <button className="text-action" onClick={onSync}>保存并同步这次记录</button>}</main></MobileScroll>;
+  const feedback = record ? buildSaveFeedback(record) : null;
+  const evidence = record ? getFeedbackEvidence(record) : null;
+  const knowledge = grape && grapeDetails[grape] ? buildKnowledgeFeedback(grape, grapeDetails[grape].aromas) : null;
+  const firstRecord = recordCount === 1;
+  const [rewardStage, setRewardStage] = useState<"insight" | "badge" | null>(() => firstTaste && evidence?.mode === "tasting" ? "insight" : firstRecord ? "badge" : null);
+  const rewardButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (record && trackedRecord.current !== record.id) {
+      trackedRecord.current = record.id;
+      trackRecordEvent("record_feedback_viewed", getRecordAnalyticsProperties(record, inputMethod));
+    }
+  }, [record?.id, inputMethod]);
+  useEffect(() => { rewardButton.current?.focus(); }, [rewardStage]);
+  if (!record || !feedback || !evidence) return null;
+  const kicker = firstRecord ? "第一杯已经收进你的图鉴" : evidence.mode === "tasting" ? "你的品鉴已记录" : "这杯酒已经收进你的图鉴";
+  return <>
+    <div className="success-underlay" inert={rewardStage !== null} aria-hidden={rewardStage !== null}>
+    <MobileScroll className="app-scroll paper-screen"><main className={`success-content ${firstRecord ? "first-success" : ""}`}>
+      <span className="success-kicker">{kicker}</span>
+      {grapeNode && <img className="success-grape" src={grapeNode.image} alt={`${grape}葡萄插画`} draggable={false} decoding="async" />}
+      {grape ? <><h1>{evidence.mode === "quick_save" ? `你点亮了「${grape}」` : grape}</h1><p>{grapeNode?.english ?? "葡萄品种已记录"}</p></> : <h1>记录已保存</h1>}
+      {!firstTaste && <div className={`first-taste-insight ${feedback.type}`}><small>{feedback.type === "personal" ? "你的真实感受" : "第一杯已收藏"}</small><p>{feedback.description}</p></div>}
+      {knowledge && <div className="knowledge-insight"><small>{knowledge.title}</small><p>{knowledge.description}</p></div>}
+      <button className="primary-action" onClick={onDone}>回到我的图鉴</button>
+      {firstRecord && isGuest && <button className="text-action" onClick={onSync}>保存并同步这次记录</button>}
+    </main></MobileScroll>
+    </div>
+    {rewardStage && <div className={`reward-overlay ${rewardStage}`}>
+      {rewardStage === "badge" && <div className="reward-confetti" aria-hidden="true">{Array.from({ length: 16 }, (_, index) => <i key={index} />)}</div>}
+      <section key={rewardStage} className="reward-popup" role="dialog" aria-modal="true" aria-labelledby="reward-title" aria-describedby="reward-description">
+        {rewardStage === "insight" ? <>
+          <div className="reward-emblem insight-emblem" aria-hidden="true"><StarFilledIcon /></div>
+          <small className="reward-eyebrow">第一条真实感受</small>
+          <h2 id="reward-title">记录你的口味线索</h2>
+          <p id="reward-description">{feedback.description}</p>
+          <button ref={rewardButton} className="primary-action" onClick={() => setRewardStage(firstRecord ? "badge" : null)}>{firstRecord ? "继续领取徽章" : "继续探索"}</button>
+        </> : <>
+          <div className="reward-coin" aria-hidden="true"><span><CheckCircledIcon /></span></div>
+          <small className="reward-eyebrow">葡萄酒图鉴 · 第一枚</small>
+          <h2 id="reward-title">获得纪念徽章</h2>
+          <strong className="reward-badge-name">初次举杯</strong>
+          <p id="reward-description">第一杯已经收进你的葡萄酒世界。去「我的」看看新徽章吧！</p>
+          <button ref={rewardButton} className="primary-action" onClick={() => setRewardStage(null)}>收下徽章</button>
+        </>}
+      </section>
+    </div>}
+  </>;
 }
 
 function ProfileScreen({ records, account, onExplore, onRecord, onRecords, onFlavor, onShare, onSettings }: { records: TastingRecord[]; account: WineAccount | null; onExplore: () => void; onRecord: () => void; onRecords: () => void; onFlavor: () => void; onShare: () => void; onSettings: () => void }) {
@@ -530,12 +671,12 @@ function ProfileScreen({ records, account, onExplore, onRecord, onRecords, onFla
     return () => window.clearTimeout(resetScroll);
   }, []);
   const badges = [
+    ...(records.length > 0 ? [{ name: "初次举杯", note: "旅程开始", icon: <CheckCircledIcon />, tier: "gold" }] : []),
     { name: "图鉴达人", note: "品种收藏", icon: <StarFilledIcon />, tier: "gold" },
     { name: "产区旅人", note: "世界探索", icon: <GlobeIcon />, tier: "silver" },
     { name: "品鉴新星", note: "持续记录", icon: <BookmarkFilledIcon />, tier: "gold" },
     { name: "红葡萄入门", note: "红葡萄收藏", icon: <LayersIcon />, tier: "silver" },
     { name: "风味发现者", note: "香气探索", icon: <DrawingPinFilledIcon />, tier: "gray" },
-    { name: "初次举杯", note: "旅程开始", icon: <CheckCircledIcon />, tier: "gray" },
   ];
   const stats = getRecordStats(records);
   const displayName = account && !account.isAnonymous ? account.name : "葡萄酒探索者";
@@ -612,7 +753,7 @@ function AuthScreen({ initialMode, onBack, onAuthenticated }: { initialMode: "lo
 
 function TastingRecordsScreen({ grape, records: allRecords, cloudMessage, onBack }: { grape: string | null; records: TastingRecord[]; cloudMessage: string | null; onBack: () => void }) {
   const [viewer, setViewer] = useState<{ photos: string[]; index: number; wine: string } | null>(null);
-  const records = grape ? allRecords.filter((record) => record.grape === grape) : allRecords;
+  const records = grape ? allRecords.filter((record) => (record.grapes ?? record.grape.split("、")).includes(grape)) : allRecords;
   const moveViewer = (direction: number) => setViewer((current) => current ? { ...current, index: (current.index + direction + current.photos.length) % current.photos.length } : null);
   return <><MobileScroll className="app-scroll paper-screen"><main className="flow-content records-content"><FlowHeader title={grape ? `${grape}的品酒笔记` : "我的品鉴记录"} onBack={onBack} />{cloudMessage && <p className="records-summary" role="status">{cloudMessage}</p>}<div className="timeline-year"><strong>{new Date().getFullYear()}</strong><span>{grape ? `${records.length} 条${grape}记录` : `共 ${records.length} 次品鉴`}</span></div><div className="records-timeline">{records.map((record, index) => { const date = splitRecordDate(record.date); const photos = record.photos ?? []; return <article className="timeline-record" key={record.id}><time className="timeline-date" dateTime={record.createdAt}><strong>{date.day}</strong><span>{date.month}</span></time><div className="timeline-dot" aria-hidden="true" /><div className="timeline-content"><div className="timeline-meta"><span>{record.grape}</span><small>{record.region}</small></div>{photos.length > 0 && <div className={`timeline-photo-grid count-${Math.min(photos.length, 3)}`}>{photos.slice(0, 9).map((photo, photoIndex) => <div key={photo}><button className="timeline-photo-button" onClick={() => setViewer({ photos, index: photoIndex, wine: record.wine })} aria-label={`查看${record.wine}第${photoIndex + 1}张照片`}><img className="timeline-photo" src={photo} alt={`${record.wine}品鉴照片 ${photoIndex + 1}`} draggable={false} loading={index < 2 ? "eager" : "lazy"} decoding="async" />{photoIndex === 8 && photos.length > 9 && <span>+{photos.length - 9}</span>}</button></div>)}</div>}<h2>{record.wine}{record.year ? ` · ${record.year}` : ""}</h2><p>{record.note || "这一杯还没有写下品鉴感受。"}</p>{record.flavors && record.flavors.length > 0 && <div className="timeline-flavors">{record.flavors.slice(0, 4).map((flavor) => <span key={flavor}>{flavor}</span>)}</div>}</div></article>; })}</div></main></MobileScroll>{viewer && <div className="photo-viewer" role="dialog" aria-modal="true" aria-label={`${viewer.wine}照片详情`} onClick={() => setViewer(null)}><header><button onClick={() => setViewer(null)} aria-label="关闭照片详情">×</button><span>{viewer.index + 1} / {viewer.photos.length}</span></header><div className="photo-viewer-stage" onClick={(event) => event.stopPropagation()}>{viewer.photos.length > 1 && <button className="photo-viewer-prev" onClick={() => moveViewer(-1)} aria-label="上一张照片">‹</button>}<img src={viewer.photos[viewer.index]} alt={`${viewer.wine}照片详情`} />{viewer.photos.length > 1 && <button className="photo-viewer-next" onClick={() => moveViewer(1)} aria-label="下一张照片">›</button>}</div><footer>{viewer.wine}</footer></div>}</>;
 }
@@ -641,16 +782,20 @@ function splitRecordDate(value: string) {
 }
 
 function FlavorPreferenceScreen({ records, onBack }: { records: TastingRecord[]; onBack: () => void }) {
-  const flavorCounts = records.flatMap((record) => record.flavors ?? []).reduce<Record<string, number>>((counts, flavor) => { counts[flavor] = (counts[flavor] ?? 0) + 1; return counts; }, {});
+  const confirmed = (record: TastingRecord, key: keyof RecordFieldMetadata) => record.fieldMetadata?.[key]?.confirmed === true;
+  const flavorCounts = records.flatMap((record) => getFeedbackEvidence(record).confirmedFlavors).reduce<Record<string, number>>((counts, flavor) => { counts[flavor] = (counts[flavor] ?? 0) + 1; return counts; }, {});
   const flavorTags = Object.entries(flavorCounts).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([name, count]) => ({ name, strength: Math.max(1, Math.min(5, count)) }));
-  const bodyValues = records.map((record) => record.bodyLevel).filter((value): value is number => typeof value === "number");
+  const bodyValues = records.map((record) => getFeedbackEvidence(record).confirmedBodyLevel).filter((value): value is number => typeof value === "number");
   const bodyAverage = bodyValues.length ? Math.round(bodyValues.reduce((sum, value) => sum + value, 0) / bodyValues.length) : 50;
   const preferences = [{ left: "清爽", right: "浓郁", value: bodyAverage }];
-  const favoriteGrapes = Object.entries(getRecordStats(records).grapeCounts).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([name]) => name).join(" · ") || "继续记录后生成";
-  const regionCounts = records.reduce<Record<string, number>>((counts, record) => { if (record.region) counts[record.region] = (counts[record.region] ?? 0) + 1; return counts; }, {});
+  const likedRecords = records.filter((record) => getFeedbackEvidence(record).confirmedPreference === "喜欢");
+  const grapeCounts = likedRecords.filter((record) => confirmed(record, "grapes")).flatMap((record) => record.grapes ?? (record.grape ? record.grape.split("、") : [])).filter((grape) => grape && grape !== "不确定").reduce<Record<string, number>>((counts, grape) => { counts[grape] = (counts[grape] ?? 0) + 1; return counts; }, {});
+  const favoriteGrapes = Object.entries(grapeCounts).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([name]) => name).join(" · ") || "继续记录后生成";
+  const regionCounts = likedRecords.filter((record) => confirmed(record, "region")).reduce<Record<string, number>>((counts, record) => { if (record.region) counts[record.region] = (counts[record.region] ?? 0) + 1; return counts; }, {});
   const favoriteRegions = Object.entries(regionCounts).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([name]) => name.split("·").pop()?.trim() ?? name).join(" · ") || "继续记录后生成";
-  const headline = records.length === 0 ? "还没有足够的品鉴记录" : bodyAverage < 45 ? "偏爱清爽轻盈的风格" : bodyAverage > 65 ? "偏爱饱满浓郁的风格" : "偏爱平衡、适中的风格";
-  return <MobileScroll className="app-scroll paper-screen"><main className="flow-content flavor-profile"><FlowHeader title="我的风味偏好" onBack={onBack} /><section className="flavor-summary"><small>你的口味画像</small><h2>{headline}</h2><p>{records.length === 0 ? "完成第一条品鉴记录后，这里会自动生成你的口味画像。" : `根据数据库中的 ${records.length} 次品鉴实时计算。`}</p></section><section className="preference-section"><h3>常出现的风味</h3><div className="preference-tags">{flavorTags.length > 0 ? flavorTags.map((tag) => <span className={`strength-${tag.strength}`} key={tag.name}>{tag.name}</span>) : <span>暂无风味数据</span>}</div></section><section className="preference-section"><h3>你偏爱的口感</h3><div className="preference-scales">{preferences.map((item) => <div className="preference-scale" key={item.left}><div><span>{item.left}</span><span>{item.right}</span></div><i><b style={{ left: `${item.value}%` }} /></i></div>)}</div></section><section className="preference-section"><h3>更常喜欢</h3><div className="favorite-list"><div><span>葡萄品种</span><strong>{favoriteGrapes}</strong></div><div><span>产区</span><strong>{favoriteRegions}</strong></div><div><span>风味</span><strong>{flavorTags.slice(0, 3).map((tag) => tag.name).join(" · ") || "继续记录后生成"}</strong></div></div></section><p className="preference-footnote">根据你的 {records.length} 次品鉴记录自动生成，继续记录会让画像更准确。</p></main></MobileScroll>;
+  const confirmedRecords = records.filter((record) => getFeedbackEvidence(record).mode === "tasting");
+  const headline = confirmedRecords.length === 0 ? "还没有足够的已确认数据" : bodyValues.length === 0 ? "继续记录，慢慢看见你的偏好" : bodyAverage < 45 ? "偏爱清爽轻盈的风格" : bodyAverage > 65 ? "偏爱饱满浓郁的风格" : "偏爱平衡、适中的风格";
+  return <MobileScroll className="app-scroll paper-screen"><main className="flow-content flavor-profile"><FlowHeader title="我的风味偏好" onBack={onBack} /><section className="flavor-summary"><small>你的口味画像</small><h2>{headline}</h2><p>{confirmedRecords.length === 0 ? "只有你亲自确认过的信息，才会用于生成口味画像。" : `根据 ${confirmedRecords.length} 次品鉴中的已确认信息实时计算。`}</p></section><section className="preference-section"><h3>常出现的风味</h3><div className="preference-tags">{flavorTags.length > 0 ? flavorTags.map((tag) => <span className={`strength-${tag.strength}`} key={tag.name}>{tag.name}</span>) : <span>暂无已确认风味</span>}</div></section><section className="preference-section"><h3>你偏爱的口感</h3>{bodyValues.length ? <div className="preference-scales">{preferences.map((item) => <div className="preference-scale" key={item.left}><div><span>{item.left}</span><span>{item.right}</span></div><i><b style={{ left: `${item.value}%` }} /></i></div>)}</div> : <p className="preference-empty">暂无已确认酒体评价</p>}</section><section className="preference-section"><h3>更常喜欢</h3><div className="favorite-list"><div><span>葡萄品种</span><strong>{favoriteGrapes}</strong></div><div><span>产区</span><strong>{favoriteRegions}</strong></div><div><span>风味</span><strong>{flavorTags.slice(0, 3).map((tag) => tag.name).join(" · ") || "继续记录后生成"}</strong></div></div></section><p className="preference-footnote">未确认的酒标识别或推断结果不会参与计算。</p></main></MobileScroll>;
 }
 
 function FlowHeader({ title, onBack }: { title: string; onBack: () => void }) { return <header className="flow-header"><button onClick={onBack} aria-label="返回"><ArrowLeftIcon /></button><h1>{title}</h1><span /></header>; }
