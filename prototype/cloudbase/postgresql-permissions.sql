@@ -1,6 +1,11 @@
 -- Run after creating the application tables.
 -- Enables safe browser access using CloudBase Auth + PostgreSQL RLS.
 
+-- Fields used by the real record form and user photo timeline.
+alter table public.tasting_records add column if not exists vintage text;
+alter table public.tasting_records add column if not exists country text;
+alter table public.tasting_records add column if not exists photo_ids jsonb not null default '[]'::jsonb;
+
 alter table public.profiles alter column id set default auth.uid();
 alter table public.wines alter column user_id set default auth.uid();
 alter table public.tasting_records alter column user_id set default auth.uid();

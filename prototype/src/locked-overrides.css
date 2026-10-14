@@ -492,6 +492,75 @@
 .region-explore-content .region-map-zoomed .region-node small { display: none; }
 .region-explore-content .region-map-zoomed .map-note { bottom: 14px; }
 
+.settings-content,
+.auth-content { padding-bottom: 46px; }
+
+.account-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #e1d6c9;
+  border-radius: 22px;
+  background: rgba(255, 253, 249, .76);
+}
+
+.account-card.registered { background: linear-gradient(145deg, #7e1637, #5d1028); border-color: transparent; color: #fff; }
+.account-avatar { width: 48px; height: 48px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; background: #ecdde0; color: #7e1637; font: 700 20px Georgia, serif; }
+.account-card.registered .account-avatar { background: rgba(255,255,255,.16); color: #fff; }
+.account-card > div { min-width: 0; }
+.account-card small { color: #9a8d85; font-size: 9px; }
+.account-card.registered small { color: rgba(255,255,255,.68); }
+.account-card h2 { margin: 4px 0; font-size: 15px; }
+.account-card p { margin: 0; color: #7d716a; font-size: 10px; line-height: 1.5; overflow-wrap: anywhere; }
+.account-card.registered p { color: rgba(255,255,255,.76); }
+
+.account-primary {
+  width: 100%;
+  height: 46px;
+  margin-top: 16px;
+  border: 0;
+  border-radius: 23px;
+  background: #7e1637;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 6px 15px rgba(126, 22, 55, .16);
+}
+
+.account-primary:disabled { opacity: .55; }
+.settings-group { margin-top: 27px; }
+.settings-group h3 { margin: 0 0 8px; color: #8f827a; font-size: 10px; font-weight: 500; }
+.settings-group > div { min-height: 51px; border-bottom: 1px solid #e3d9ce; display: flex; align-items: center; justify-content: space-between; gap: 14px; font-size: 12px; }
+.settings-group strong { color: #8a7d76; font-size: 10px; font-weight: 500; text-align: right; }
+.settings-note { margin: 22px 8px 0; color: #978b84; font-size: 9px; line-height: 1.6; text-align: center; }
+
+.auth-heading { padding: 5px 18px 20px; text-align: center; }
+.auth-heading > span { font-size: 33px; }
+.auth-heading h1 { margin: 8px 0 6px; color: #5d1028; font: 700 23px Georgia, "Noto Serif SC", serif; }
+.auth-heading p { margin: 0; color: #83766f; font-size: 10px; line-height: 1.6; }
+
+.auth-tabs { height: 42px; padding: 3px; display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #ddd3c7; border-radius: 22px; background: rgba(255,255,255,.32); }
+.auth-tabs button { border: 0; border-radius: 18px; background: transparent; color: #82766f; font-size: 12px; font-weight: 650; }
+.auth-tabs button.active { background: #7e1637; color: #fff; }
+.login-method { margin: 16px 2px 2px; display: flex; gap: 18px; }
+.login-method button { padding: 0 0 5px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #968981; font-size: 10px; }
+.login-method button.active { border-color: #7e1637; color: #7e1637; font-weight: 700; }
+
+.auth-fields { margin-top: 13px; border-top: 1px solid #e2d8cd; }
+.auth-fields label { min-height: 60px; display: grid; grid-template-columns: 66px 1fr; align-items: center; border-bottom: 1px solid #e2d8cd; }
+.auth-fields label > span { color: #756961; font-size: 11px; }
+.auth-fields input { min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; color: #342a27; font-size: 12px; text-align: right; }
+.forgot-link,
+.auth-back-link { display: block; margin: 11px 2px 0 auto; border: 0; background: transparent; color: #7e1637; font-size: 10px; }
+.auth-back-link { margin: 13px auto 0; }
+.verify-code { margin-top: 12px; }
+.verify-code input { width: 100%; height: 56px; box-sizing: border-box; border: 1px solid #dcd1c5; border-radius: 17px; background: rgba(255,255,255,.5); color: #5d1028; text-align: center; font-size: 22px; letter-spacing: 8px; outline: 0; }
+.auth-message { margin: 13px 5px 0; padding: 9px 11px; border-radius: 12px; font-size: 10px; line-height: 1.45; }
+.auth-message.success { background: #e9eee3; color: #5f684e; }
+.auth-message.error { background: #f5e5e8; color: #8a2344; }
+.auth-terms { margin: 24px 14px 0; color: #a0958e; font-size: 8px; line-height: 1.6; text-align: center; }
+
 .records-content { padding-bottom: 74px; }
 .records-summary { margin: -5px 3px 14px; color: #81756e; font-size: 11px; }
 
@@ -576,13 +645,36 @@
   white-space: nowrap;
 }
 
+.timeline-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.timeline-photo-grid.count-1 { grid-template-columns: minmax(0, 196px); }
+.timeline-photo-grid.count-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.timeline-photo-grid > div { position: relative; aspect-ratio: 1; min-width: 0; }
+
 .timeline-photo {
   display: block;
   width: 100%;
-  height: 154px;
-  border-radius: 16px;
+  height: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
   object-fit: cover;
-  box-shadow: 0 5px 16px rgba(64, 42, 34, .1);
+  box-shadow: 0 3px 10px rgba(64, 42, 34, .08);
+}
+
+.timeline-photo-grid > div > span {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: rgba(38, 29, 26, .48);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  font-weight: 700;
 }
 
 .timeline-content h2 {
@@ -617,6 +709,43 @@
   overflow: hidden;
   line-height: 1.7;
 }
+
+.note-photos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.note-photos figure,
+.add-note-photo {
+  position: relative;
+  aspect-ratio: 1;
+  min-width: 0;
+  margin: 0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.note-photos figure img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.note-photos figure > button { position: absolute; top: 5px; right: 5px; width: 22px; height: 22px; border: 0; border-radius: 50%; background: rgba(35, 28, 26, .72); color: #fff; display: grid; place-items: center; font-size: 16px; line-height: 1; }
+.note-photos figcaption { position: absolute; left: 6px; bottom: 6px; padding: 2px 6px; border-radius: 8px; background: rgba(126, 22, 55, .88); color: #fff; font-size: 8px; }
+
+.add-note-photo {
+  border: 1px dashed #cbbdb2;
+  background: rgba(255, 255, 255, .35);
+  color: #7e1637;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+}
+
+.add-note-photo svg { width: 21px; height: 21px; }
+.add-note-photo span { font-size: 10px; }
+.upload-note-photo { margin-top: 10px; min-height: 38px; width: 100%; border: 0; border-radius: 19px; background: #eee7df; color: #6c5e57; display: flex; align-items: center; justify-content: center; gap: 7px; font-size: 11px; }
+.upload-note-photo svg { width: 15px; height: 15px; }
+.photo-help { display: block; margin-top: 7px; color: #9b8f88; font-size: 9px; text-align: center; }
 
 .select-field {
   width: 100%;
@@ -683,6 +812,27 @@
 .picker-options button.selected { color: #7e1637; font-weight: 700; }
 .picker-options button svg { color: #7e1637; }
 .picker-empty { padding: 22px 0; color: #958983; text-align: center; font-size: 12px; }
+
+.share-content { padding-bottom: 70px; }
+
+.share-card {
+  padding: 24px 20px 18px;
+  border: 1px solid rgba(126, 22, 55, .11);
+  border-radius: 25px;
+  background: rgba(255, 250, 244, .82);
+  box-shadow: 0 10px 28px rgba(69, 43, 34, .09);
+}
+
+.share-card > small { color: #8d7f77; font-size: 10px; letter-spacing: .4px; }
+.share-card h2 { margin: 8px 0 10px; color: #5d1028; font: 700 22px/1.3 Georgia, "Noto Serif SC", serif; }
+.share-card > p { margin: 0 0 17px; color: #756861; font-size: 11px; }
+.share-card > p strong { color: #7e1637; font-size: 15px; }
+.share-photo-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.share-photo-grid img { display: block; width: 100%; aspect-ratio: 1; border-radius: 7px; object-fit: cover; }
+.share-empty { min-height: 174px; border-radius: 16px; background: #eee8df; color: #91857e; display: grid; place-items: center; align-content: center; gap: 9px; text-align: center; font-size: 10px; }
+.share-empty svg { width: 24px; height: 24px; }
+.share-card footer { margin-top: 18px; color: #a2948c; font-size: 9px; text-align: right; }
+.share-tip { margin: 11px 12px 0; color: #998d86; font-size: 9px; line-height: 1.6; text-align: center; }
 
 .record-camera-flow { padding: 3px 0 18px; }
 
