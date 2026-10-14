@@ -36,6 +36,7 @@ const KeyboardContext = createContext<KeyboardContextValue | null>(null);
 
 export function KeyboardProvider({ children }: PropsWithChildren) {
   const { device } = useMobileDevice();
+  const simulatesKeyboard = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("keyboard") === "1";
   const [visible, setVisible] = useState(false);
   const [dragOffset, setRawDragOffset] = useState(0);
   const [isDragging, setDragging] = useState(false);
@@ -60,7 +61,9 @@ export function KeyboardProvider({ children }: PropsWithChildren) {
         setRawDragOffset(0);
         setDragging(false);
         setFocusedElement(element ?? null);
-        setVisible(true);
+        // Real phones already resize the visual viewport for their system keyboard.
+        // Only show the illustrated keyboard in the explicit desktop preview mode.
+        setVisible(simulatesKeyboard);
       },
       hide: () => {
         focusedElement?.blur();
@@ -69,7 +72,7 @@ export function KeyboardProvider({ children }: PropsWithChildren) {
         setVisible(false);
       },
     }),
-    [dragOffset, focusedElement, fullHeight, isDragging, visible],
+    [dragOffset, focusedElement, fullHeight, isDragging, simulatesKeyboard, visible],
   );
 
   return <KeyboardContext.Provider value={value}>{children}</KeyboardContext.Provider>;
@@ -215,6 +218,8 @@ export function KeyboardDock() {
   const keyboardTransition = keyboard.isDragging
     ? { duration: 0 }
     : { duration: 0.26, ease: [0.2, 0.8, 0.2, 1] as [number, number, number, number] };
+
+  if (!keyboard.visible) return null;
 
   return (
     <motion.div
