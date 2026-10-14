@@ -923,8 +923,18 @@
 .device-camera,
 .status-bar,
 .home-indicator-svg,
-.android-navigation-bar {
+.android-navigation-bar,
+.keyboard-dock {
   display: none !important;
+}
+
+/* The deployed app uses the phone's real keyboard, never the preview artwork. */
+.mobile-page {
+  --keyboard-height: 0px !important;
+}
+
+.mobile-scroll {
+  bottom: 0 !important;
 }
 
 .phone-scale-box {
