@@ -140,65 +140,51 @@
   margin-right: -22px;
 }
 
-.badge-row { display: flex; gap: 12px; padding: 2px 22px 5px 0; }
+.badge-row { display: flex; gap: 8px; padding: 2px 22px 8px 0; }
+
+.badge-count { color: #8f8077; font-size: 11px; }
 
 .badge-item {
-  flex: 0 0 94px;
-  min-width: 94px;
-  border: 0;
+  flex: 0 0 108px;
+  min-width: 108px;
   padding: 0;
-  background: transparent;
   display: flex;
   flex-direction: column;
   align-items: center;
   color: #342a27;
 }
 
-.badge-coin {
-  width: 68px;
-  height: 68px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  position: relative;
-  border: 2px solid rgba(255, 255, 255, .7);
-  box-shadow: inset 0 0 0 2px rgba(83, 64, 39, .24), inset 0 0 0 6px rgba(255, 255, 255, .16), 0 5px 10px rgba(56, 42, 30, .16);
+.badge-medal {
+  width: 82px;
+  height: 82px;
+  object-fit: contain;
+  filter: drop-shadow(0 5px 5px rgba(60, 39, 32, .18));
 }
 
-.badge-item.gold .badge-coin { background: linear-gradient(145deg, #e0c16f, #ad8539); color: #fff7cf; }
-.badge-item.silver .badge-coin { background: linear-gradient(145deg, #d7d5cf, #979894); color: #fff; }
-.badge-item.gray .badge-coin { background: linear-gradient(145deg, #e7e3dc, #bbb7b0); color: #746e68; }
-
-.badge-coin > span {
-  width: 44px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  border: 1px solid currentColor;
-  border-radius: 50%;
-}
-
-.badge-coin svg {
-  width: 21px;
-  height: 21px;
-}
+.badge-item.in-progress .badge-medal { filter: grayscale(.58) opacity(.72) drop-shadow(0 3px 3px rgba(60, 39, 32, .1)); }
+.badge-item.locked .badge-medal { filter: grayscale(1) opacity(.52); }
+.badge-item.locked strong { color: #817c78; }
+.badge-item.in-progress strong { color: #755a5c; }
+.badge-item.earned .badge-medal { filter: drop-shadow(0 5px 5px rgba(60, 39, 32, .18)); }
 
 .badge-item strong {
   width: 100%;
-  margin-top: 8px;
+  margin-top: 5px;
   overflow: hidden;
   color: #5d1028;
-  font-size: 10px;
+  font-size: 11px;
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .badge-item small {
-  margin-top: 3px;
+  width: 100%;
   color: #8a7e77;
-  font-size: 8px;
-  white-space: nowrap;
+  font-size: 9px;
+  line-height: 1.35;
+  text-align: center;
+  white-space: normal;
 }
 
 .footprint-section {
@@ -225,8 +211,33 @@
 .footprint-row button:last-child { border-right: 0; }
 .footprint-row strong { color: #7e1637; font: 700 20px Georgia, serif; }
 .footprint-row span { font-size: 10px; }
-.footprint-row button:first-child { cursor: pointer; }
-.footprint-row button:first-child:active { background: rgba(126, 22, 55, .05); }
+.footprint-row button { cursor: pointer; }
+.footprint-row button:active { background: rgba(126, 22, 55, .05); }
+
+.footprint-summary-content { padding-bottom: 70px; }
+.footprint-summary-intro { margin: -2px 2px 20px; color: #8a7e77; font-size: 11px; line-height: 1.55; }
+.footprint-empty { margin: 30px 4px; color: #8a7e77; font-size: 12px; line-height: 1.7; text-align: center; }
+.grape-summary-list, .country-summary-list { display: grid; gap: 12px; }
+.grape-summary-card { width: 100%; min-width: 0; display: grid; grid-template-columns: 60px minmax(0, 1fr) 12px; align-items: center; gap: 11px; padding: 14px 12px; border: 1px solid #e6dbd0; border-radius: 19px; background: #fffaf4; color: #51433e; text-align: left; box-shadow: 0 5px 14px rgba(70, 48, 39, .04); }
+.grape-summary-card:active, .region-summary-row:active { transform: scale(.985); background: #f8eef0; }
+.grape-summary-card > img { width: 60px; height: 72px; object-fit: contain; mix-blend-mode: multiply; }
+.grape-summary-generic { width: 60px; height: 72px; fill: #e9d9df; stroke: #8c5c6b; stroke-width: 1.4; }
+.grape-summary-copy { min-width: 0; display: grid; gap: 5px; }
+.grape-summary-copy > strong { color: #65152f; font: 700 15px/1.25 Georgia, "Noto Serif SC", serif; }
+.grape-summary-copy > strong small { display: block; margin-top: 3px; color: #9b817c; font: 400 11px/1.25 Arial, sans-serif; }
+.grape-summary-copy > span, .grape-summary-copy > em { color: #746a62; font-size: 11px; line-height: 1.4; font-style: normal; }
+.grape-summary-copy > em { color: #7c6f58; overflow-wrap: anywhere; }
+.summary-chevron { color: #a48f89; font-size: 20px; }
+.country-summary-group { overflow: hidden; border: 1px solid #e6dbd0; border-radius: 19px; background: #fffaf4; }
+.country-summary-group > header { display: flex; align-items: center; gap: 9px; padding: 14px 15px; background: #f3e9e0; color: #741a39; }
+.country-summary-group > header svg { width: 16px; height: 16px; }
+.country-summary-group h2 { margin: 0; font: 700 15px Georgia, "Noto Serif SC", serif; }
+.country-summary-group > header span { margin-left: auto; color: #836e68; font-size: 11px; }
+.region-summary-row { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 15px; border: 0; border-top: 1px solid #eee4da; background: transparent; text-align: left; }
+.region-summary-main { min-width: 0; display: grid; gap: 4px; }
+.region-summary-main strong { color: #5d1028; font-size: 14px; }
+.region-summary-main small { color: #877a72; font-size: 11px; line-height: 1.4; }
+.region-summary-row .summary-chevron { flex: 0 0 auto; }
 
 .grape-detail {
   padding: 2px 0 18px;

@@ -5,6 +5,7 @@ node_modules/
 # Local build, QA, and deployment artifacts
 /output/
 /tmp/
+/prototype/tmp/
 /recognizeWineLabel*.zip
 
 # Local visual QA captures

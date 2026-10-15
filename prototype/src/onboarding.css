@@ -57,10 +57,11 @@
   box-shadow: 0 3px 9px rgba(126, 22, 55, .1), inset 0 1px 0 rgba(255,255,255,.7);
   animation: taste-choice-pop 220ms ease-out;
 }
-.wine-app .taste-content { padding-top: 126px; padding-bottom: 150px; }
-.taste-header-dock { position: absolute; z-index: 12; top: 0; left: 0; right: 0; box-sizing: border-box; padding: 64px 20px 8px; background: linear-gradient(180deg, #fbf7ef 88%, rgba(251, 247, 239, 0)); }
-.taste-header-dock .flow-header { margin-bottom: 0; }
-.taste-save-bar { position: absolute; z-index: 12; left: 0; right: 0; box-sizing: border-box; padding: 12px 20px 10px; background: rgba(251, 247, 239, .97); border-top: 1px solid rgba(102, 83, 73, .12); box-shadow: 0 -8px 22px rgba(65, 44, 37, .04); backdrop-filter: blur(10px); }
+.wine-app .record-flow-content { padding-top: 86px; }
+.wine-app .taste-content { padding-bottom: 150px; }
+.record-header-dock { position: absolute; z-index: 12; top: 0; left: 0; right: 0; box-sizing: border-box; padding: 24px 20px 8px; background: linear-gradient(180deg, #fbf7ef 88%, rgba(251, 247, 239, 0)); }
+.record-header-dock .flow-header { margin-bottom: 0; }
+.taste-save-bar { position: absolute; z-index: 12; left: 0; right: 0; box-sizing: border-box; padding: 12px 20px calc(10px + env(safe-area-inset-bottom, 0px)); background: rgba(251, 247, 239, .97); border-top: 1px solid rgba(102, 83, 73, .12); box-shadow: 0 -8px 22px rgba(65, 44, 37, .04); backdrop-filter: blur(10px); }
 .taste-save-bar .primary-action { margin-top: 0; }
 .taste-save-bar .save-requirement { margin: 0 0 8px; }
 .taste-save-bar .helper-copy { margin: 0 0 8px; text-align: center; }

@@ -17,6 +17,9 @@ API Key. It uses CloudBase authentication and PostgreSQL RLS instead.
    access only files under their own `{uid}/...` path.
 7. Run `postgresql-record-metadata.sql` to add multi-grape storage and the
    per-field `source` / `confirmed` metadata used by preference calculations.
+8. Run `postgresql-cellar.sql` to create user-owned cellar entries and movement
+   history, link cellar tastings, and install the two atomic inventory functions.
+   This migration is required before “我的藏酒” can load or save cloud data.
 
 Re-run the relevant SQL files after pulling schema or policy changes. Committing or
 deploying the web client does not apply PostgreSQL RLS policies automatically.

@@ -21,6 +21,8 @@ export type TastingRecord = {
   bodyLevel?: number;
   createdAt?: string;
   fieldMetadata?: RecordFieldMetadata;
+  cellarEntryId?: string;
+  cellarMovementId?: string;
 };
 
 export type FieldSource = "user_selected" | "label_scan" | "inferred" | "default";
@@ -90,6 +92,8 @@ export function canSaveRecord(input: { wine: string; grapes: string[]; country: 
 export type NewTastingRecord = Omit<TastingRecord, "id" | "date"> & {
   tastedAt?: Date;
   photoFiles?: File[];
+  existingPhotoIds?: string[];
+  cellarQuantity?: number;
 };
 
 type CloudRecord = {
@@ -109,6 +113,8 @@ type CloudRecord = {
   tasted_at?: string;
   created_at?: string;
   field_metadata?: RecordFieldMetadata;
+  cellar_entry_id?: string;
+  cellar_movement_id?: string;
 };
 
 function formatRecordDate(value?: string) {
@@ -136,10 +142,12 @@ function fromCloud(record: CloudRecord, photoUrls: string[] = []): TastingRecord
     bodyLevel: record.body_level,
     createdAt: record.created_at,
     fieldMetadata: record.field_metadata,
+    cellarEntryId: record.cellar_entry_id,
+    cellarMovementId: record.cellar_movement_id,
   };
 }
 
-async function resolvePhotoUrls(records: CloudRecord[]) {
+export async function resolvePhotoUrls(records: Array<{ photo_ids?: string[] | null }>) {
   const photoIds = [...new Set(records.flatMap((record) => record.photo_ids ?? []))];
   if (photoIds.length === 0) return new Map<string, string>();
   const { cloudbaseApp } = await getCloudbase();
@@ -176,7 +184,7 @@ function fileExtension(file: File) {
   return file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
 }
 
-async function uploadPhotos(files: File[], userId: string, recordId: string) {
+export async function uploadRecordPhotos(files: File[], userId: string, recordId: string) {
   if (files.length === 0) return [];
   const { cloudbaseApp } = await getCloudbase();
   const bucket = cloudbaseApp.storage.from(PHOTO_BUCKET);
@@ -200,29 +208,37 @@ export async function listTastingRecords(): Promise<TastingRecord[]> {
   const { ensureCloudbaseUser, getCloudbasePostgres } = await getCloudbase();
   const userId = await ensureCloudbaseUser();
   const db = getCloudbasePostgres();
-  const extendedResult = await db
-    .from(COLLECTION)
-    .select("id,user_id,grape,grapes,wine_name,vintage,country,region,photo_ids,note,preference,flavors,body_level,field_metadata,tasted_at,created_at")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(100);
-  let data: unknown[] | null = extendedResult.data;
-  let error = extendedResult.error;
-
-  // Remain readable before the optional metadata migration has been applied.
-  if (error && /grapes|field_metadata|column/i.test(String(error.message ?? error))) {
-    const legacyResult = await db
-      .from(COLLECTION)
-      .select("id,user_id,grape,wine_name,vintage,country,region,photo_ids,note,preference,flavors,body_level,tasted_at,created_at")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(100);
-    data = legacyResult.data;
-    error = legacyResult.error;
+  const pageSize = 100;
+  const fetchAll = async (columns: string) => {
+    const result: CloudRecord[] = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await db
+        .from(COLLECTION)
+        .select(columns)
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      const page = (data ?? []) as unknown as CloudRecord[];
+      result.push(...page);
+      if (page.length < pageSize) return result;
+    }
+  };
+  let cloudRecords: CloudRecord[];
+  try {
+    cloudRecords = await fetchAll("id,user_id,grape,grapes,wine_name,vintage,country,region,photo_ids,note,preference,flavors,body_level,field_metadata,tasted_at,created_at,cellar_entry_id,cellar_movement_id");
+  } catch (error) {
+    // Remain readable before the optional metadata migration has been applied.
+    const message = error && typeof error === "object" && "message" in error ? String(error.message) : String(error);
+    if (!/grapes|field_metadata|cellar_entry_id|cellar_movement_id|column/i.test(message)) throw error;
+    try {
+      cloudRecords = await fetchAll("id,user_id,grape,grapes,wine_name,vintage,country,region,photo_ids,note,preference,flavors,body_level,field_metadata,tasted_at,created_at");
+    } catch (legacyError) {
+      if (!/grapes|field_metadata|column/i.test(String(legacyError))) throw legacyError;
+      cloudRecords = await fetchAll("id,user_id,grape,wine_name,vintage,country,region,photo_ids,note,preference,flavors,body_level,tasted_at,created_at");
+    }
   }
-
-  if (error) throw error;
-  const cloudRecords = (data ?? []) as CloudRecord[];
   const photoUrls = await resolvePhotoUrls(cloudRecords);
   return cloudRecords.map((record) => fromCloud(record, (record.photo_ids ?? []).map((id) => photoUrls.get(id)).filter((url): url is string => Boolean(url))));
 }
@@ -243,7 +259,7 @@ export async function createTastingRecord(
   );
   if (profileError) throw profileError;
 
-  const photoIds = await uploadPhotos(record.photoFiles ?? [], userId, id);
+  const photoIds = [...(record.existingPhotoIds ?? []), ...await uploadRecordPhotos(record.photoFiles ?? [], userId, id)];
 
   const payload = {
     id,
@@ -264,6 +280,20 @@ export async function createTastingRecord(
     created_at: createdAt,
     updated_at: createdAt,
   };
+  if (record.cellarEntryId) {
+    const rpc = db as unknown as { rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: { movement_id?: string } | null; error: Error | null }> };
+    if (typeof rpc.rpc !== "function") throw new Error("当前 CloudBase SDK 不支持藏酒事务，请更新 SDK 后重试");
+    const { data, error } = await rpc.rpc("save_cellar_tasting", {
+      p_entry_id: record.cellarEntryId,
+      p_quantity: record.cellarQuantity ?? 1,
+      p_event_date: tastedAt.slice(0, 10),
+      p_record: payload,
+    });
+    if (error) throw error;
+    const cloudRecord: CloudRecord = { ...payload, cellar_entry_id: record.cellarEntryId, cellar_movement_id: data?.movement_id };
+    const photoUrls = await resolvePhotoUrls([cloudRecord]).catch(() => new Map<string, string>());
+    return fromCloud(cloudRecord, photoIds.map((photoId) => photoUrls.get(photoId)).filter((url): url is string => Boolean(url)));
+  }
   let { error } = await db.from(COLLECTION).insert(payload);
 
   if (error && /grapes|field_metadata|column/i.test(String(error.message ?? error))) {

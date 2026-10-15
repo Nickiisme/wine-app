@@ -41,4 +41,21 @@ Focused checks were performed on the grape detail sheet and the enlarged country
 
 - P3: future region nodes can use real geographic positions once production map data is introduced.
 
+## Badge redesign check (2026-10-15)
+
+- Source visual truth: `/var/folders/97/_xk916z5461gmldt5xzpfsg00000gn/T/codex-clipboard-2e15a296-c7e6-4033-81a5-0c017259aa4a.png` and the companion close-up reference supplied in chat.
+- Implementation screenshot: `/Users/nicki/Documents/ChatGPT/wine-app/prototype/tmp/badges-profile-preview.png`.
+- Viewport: 1280 × 720 desktop browser displaying the app's phone-width profile surface. Source: 941 × 1592 pixels; implementation screenshot: 1280 × 720 pixels. Comparison is of medal material and shape, not full-screen layout or pixel alignment.
+- State: new user, five locked badges. Earned artwork was also inspected as individual transparent assets at full resolution.
+- Full-view comparison: reference has a dark gallery and large medals; the app keeps its established ivory profile and compact carousel. The adapted medals preserve the hexagonal silhouette, raised metal rim, enamel center, and restrained embossed symbol.
+- Focused-region comparison: the three visible locked medals show their contours and distinct symbols at phone size. The reference's brighter metal treatment is reserved for earned badges; grayscale clearly marks locked items.
+- Typography: existing app heading and label hierarchy retained. Badge labels are short and fit within each carousel item.
+- Spacing: medal, title, and condition form a readable vertical group without crowding the footprint section.
+- Colors: burgundy, sage, ivory, and champagne gold adapt the reference's metal/enamel language to the current app palette.
+- Image quality: five transparent 1024 px medal assets display cleanly at 82 px; no visible background rectangle or stretching.
+- Copy: each badge names a concrete condition; the section shows the real earned count.
+- Browser check: profile navigation and carousel render; no console warnings or errors.
+- Comparison history: initial locked-state capture made medals too faint; opacity increased from .32 to .52 and the final profile was captured again.
+- Remaining gap: the live account has no saved records, so earned and in-progress states were verified from their assets and rendering rules rather than a live record sequence.
+
 final result: passed
