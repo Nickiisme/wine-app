@@ -57,17 +57,14 @@
   box-shadow: 0 3px 9px rgba(126, 22, 55, .1), inset 0 1px 0 rgba(255,255,255,.7);
   animation: taste-choice-pop 220ms ease-out;
 }
-.taste-choice-row button.selected::after,
-.taste-flavor-grid button.selected::after {
-  content: "";
-  position: absolute;
-  right: 8px;
-  top: 7px;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #9d3653;
-}
+.wine-app .taste-content { padding-top: 126px; padding-bottom: 150px; }
+.taste-header-dock { position: absolute; z-index: 12; top: 0; left: 0; right: 0; box-sizing: border-box; padding: 64px 20px 8px; background: linear-gradient(180deg, #fbf7ef 88%, rgba(251, 247, 239, 0)); }
+.taste-header-dock .flow-header { margin-bottom: 0; }
+.taste-save-bar { position: absolute; z-index: 12; left: 0; right: 0; box-sizing: border-box; padding: 12px 20px 10px; background: rgba(251, 247, 239, .97); border-top: 1px solid rgba(102, 83, 73, .12); box-shadow: 0 -8px 22px rgba(65, 44, 37, .04); backdrop-filter: blur(10px); }
+.taste-save-bar .primary-action { margin-top: 0; }
+.taste-save-bar .save-requirement { margin: 0 0 8px; }
+.taste-save-bar .helper-copy { margin: 0 0 8px; text-align: center; }
+.taste-save-bar .primary-action:disabled { opacity: .5; box-shadow: none; }
 .body-choice-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
 .body-choice-row button { min-width: 0; min-height: 43px; padding: 2px; border: 1px solid #ded5c7; border-radius: 13px; background: #fffaf3; color: #766b64; font-size: 10px; line-height: 1.2; }
 .body-choice-row button.selected { font-weight: 700; }

@@ -1,0 +1,9 @@
+{
+  "name": "recognize-wine-label",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "dependencies": {
+    "tencentcloud-sdk-nodejs-ocr": "4.1.320"
+  }
+}

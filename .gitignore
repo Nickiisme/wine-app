@@ -1,5 +1,11 @@
 .pnpm-store/
+node_modules/
 .DS_Store
+
+# Local build, QA, and deployment artifacts
+/output/
+/tmp/
+/recognizeWineLabel*.zip
 
 # Local visual QA captures
 prototype/*-raw.png
