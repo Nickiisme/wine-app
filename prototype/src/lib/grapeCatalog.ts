@@ -79,6 +79,7 @@ export function canonicalGrapeName(name: string): string | null {
 }
 
 export function recordGrapeNames(record: TastingRecord): string[] {
+  if (record.fieldMetadata?.grapes?.confirmed === false) return [];
   const source = record.grapes?.length ? record.grapes : record.grape.split("、");
   return [...new Set(source.map(canonicalGrapeName).filter((name): name is string => Boolean(name)))];
 }

@@ -171,6 +171,7 @@ export default function Prototype() {
     firstBadge.src = asset("assets/badges/first-glass.png");
   }, []);
   const [screen, setScreen] = useState<Screen>("explore");
+  const [dismissedExplorePrompt, setDismissedExplorePrompt] = useState<"empty" | "first" | null>(null);
   const [tab, setTab] = useState<ExploreTab>("grapes");
   const [recordSheet, setRecordSheet] = useState(false);
   const [recordFilter, setRecordFilter] = useState<RecordFilter>(null);
@@ -501,7 +502,7 @@ export default function Prototype() {
   return (
     <div className="wine-app">
       {screen === "onboarding" && <OnboardingScreen onRecord={() => { rememberOnboarding(); go("explore"); openRecordChoices(); }} onExplore={() => { rememberOnboarding(); go("explore"); }} />}
-      {screen === "explore" && <ExploreScreen tab={tab} records={records} recordsLoaded={recordsLoaded} account={account} onTab={setTab} onRecord={openRecordChoices} onProfile={() => go("profile")} onAllGrapes={() => go("allGrapes")} onNotes={(grape) => openRecords({ kind: "grape", grape }, "explore")} />}
+      {screen === "explore" && <ExploreScreen tab={tab} records={records} recordsLoaded={recordsLoaded} account={account} dismissedPrompt={dismissedExplorePrompt} onDismissPrompt={setDismissedExplorePrompt} onTab={setTab} onRecord={openRecordChoices} onProfile={() => go("profile")} onAllGrapes={() => go("allGrapes")} onNotes={(grape) => openRecords({ kind: "grape", grape }, "explore")} />}
       {screen === "allGrapes" && <AllGrapesScreen records={records} onBack={() => go("explore")} onNotes={(grape) => openRecords({ kind: "grape", grape }, "allGrapes")} />}
       {screen === "confirm" && <ConfirmScreen draft={draft} scanState={labelScanState} scanMessage={labelScanMessage} onChange={setDraft} onBack={() => go("explore")} onNext={() => go("taste")} />}
       {screen === "taste" && <TasteScreen liked={liked} setLiked={setLiked} selectedFlavors={selectedFlavors} toggleFlavor={(flavor) => setSelectedFlavors((current) => current.includes(flavor) ? current.filter((item) => item !== flavor) : [...current, flavor])} note={tastingNote} onNoteChange={setTastingNote} bodyLevel={bodyLevel} onBodyLevel={setBodyLevel} photos={draft.photos} existingPhotos={tastingCellar?.photos ?? []} cellarSummary={tastingCellar ? `${tastingCellar.wineName || "未命名藏酒"} · 本次 ${consumeQuantity} 瓶` : null} onCamera={() => noteCameraInput.current?.click()} onGallery={() => noteGalleryInput.current?.click()} onRemovePhoto={(id) => setDraft((current) => { const removed = current.photos.find((photo) => photo.id === id); if (removed) URL.revokeObjectURL(removed.preview); return { ...current, photos: current.photos.filter((photo) => photo.id !== id) }; })} onBack={() => go(tastingCellarId ? "cellarConsume" : "confirm")} onSave={saveTasting} canSave={recordCanBeSaved} saving={savingRecord} cloudMessage={cloudMessage} />}
@@ -547,10 +548,9 @@ function AtlasTabs({ tab, onTab, pinned = false, inactive = false }: { tab: Expl
   return <div className={`atlas-tabs ${pinned ? "atlas-tabs-pinned" : ""}`} role="tablist" aria-label={pinned ? "图鉴视图，已置顶" : "图鉴视图"} aria-hidden={inactive || undefined}><button role="tab" aria-selected={tab === "grapes"} tabIndex={inactive ? -1 : undefined} className={tab === "grapes" ? "active" : ""} onClick={() => onTab("grapes")}>品种图鉴</button><button role="tab" aria-selected={tab === "regions"} tabIndex={inactive ? -1 : undefined} className={tab === "regions" ? "active" : ""} onClick={() => onTab("regions")}>产区地图</button></div>;
 }
 
-function ExploreScreen({ tab, records, recordsLoaded, account, onTab, onRecord, onProfile, onAllGrapes, onNotes }: { tab: ExploreTab; records: TastingRecord[]; recordsLoaded: boolean; account: WineAccount | null; onTab: (tab: ExploreTab) => void; onRecord: () => void; onProfile: () => void; onAllGrapes: () => void; onNotes: (grape: string) => void }) {
+function ExploreScreen({ tab, records, recordsLoaded, account, dismissedPrompt, onDismissPrompt, onTab, onRecord, onProfile, onAllGrapes, onNotes }: { tab: ExploreTab; records: TastingRecord[]; recordsLoaded: boolean; account: WineAccount | null; dismissedPrompt: "empty" | "first" | null; onDismissPrompt: (kind: "empty" | "first") => void; onTab: (tab: ExploreTab) => void; onRecord: () => void; onProfile: () => void; onAllGrapes: () => void; onNotes: (grape: string) => void }) {
   const [selectedGrape, setSelectedGrape] = useState<string | null>(null);
   const [tabsPinned, setTabsPinned] = useState(false);
-  const [dismissedPrompt, setDismissedPrompt] = useState<"empty" | "first" | null>(null);
   const contentRef = useRef<HTMLElement>(null);
   const tabsAnchorRef = useRef<HTMLDivElement>(null);
   const stats = getRecordStats(records);
@@ -578,8 +578,8 @@ function ExploreScreen({ tab, records, recordsLoaded, account, onTab, onRecord, 
     </MobileScroll>
     {tabsPinned && <div className="atlas-tabs-dock"><AtlasTabs tab={tab} onTab={onTab} pinned /></div>}
     <BottomNav active="explore" onExplore={() => onTab(tab)} onRecord={onRecord} onProfile={onProfile} />
-    <BottomSheet open={promptOpen} onOpenChange={(open) => { if (!open && promptKind) setDismissedPrompt(promptKind); }} title={promptKind === "empty" ? "点亮第一个品种" : "下一杯探索"} description={promptKind === "empty" ? "从一杯酒开始，慢慢建立属于你的葡萄图鉴" : "根据你的第一条品鉴记录，为你准备了一点灵感"} snap={0.4}>
-      {promptKind && <div className="explore-prompt"><span className="explore-prompt-icon">{promptKind === "empty" ? <CameraIcon /> : "✦"}</span><p>{promptKind === "empty" ? "不知道是什么葡萄也没关系。拍下酒标，我们会帮你填写品种与产区。" : suggestNextTaste(records[0])}</p><button className="primary-action" onClick={() => { setDismissedPrompt(promptKind); onRecord(); }}>{promptKind === "empty" ? "开始记录" : "遇到下一杯时，继续记下来"}</button><button className="text-action" onClick={() => setDismissedPrompt(promptKind)}>稍后再说</button></div>}
+    <BottomSheet open={promptOpen} onOpenChange={(open) => { if (!open && promptKind) onDismissPrompt(promptKind); }} title={promptKind === "empty" ? "点亮第一个品种" : "下一杯探索"} description={promptKind === "empty" ? "从一杯酒开始，慢慢建立属于你的葡萄图鉴" : "根据你的第一条品鉴记录，为你准备了一点灵感"} snap={0.4}>
+      {promptKind && <div className="explore-prompt"><span className="explore-prompt-icon">{promptKind === "empty" ? <CameraIcon /> : "✦"}</span><p>{promptKind === "empty" ? "不知道是什么葡萄也没关系。拍下酒标，我们会帮你填写品种与产区。" : suggestNextTaste(records[0])}</p><button className="primary-action" onClick={() => { onDismissPrompt(promptKind); onRecord(); }}>{promptKind === "empty" ? "开始记录" : "遇到下一杯时，继续记下来"}</button><button className="text-action" onClick={() => onDismissPrompt(promptKind)}>稍后再说</button></div>}
     </BottomSheet>
     <GrapeDetailSheet name={selectedGrape} records={records} onClose={() => setSelectedGrape(null)} onNotes={onNotes} onCompare={setSelectedGrape} />
   </>;
