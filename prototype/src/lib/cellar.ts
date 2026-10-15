@@ -68,11 +68,11 @@ function migrationError(error: unknown): Error {
   const rawMessage = error && typeof error === "object" && "message" in error ? error.message : error;
   const detail = typeof rawMessage === "string" ? rawMessage : JSON.stringify(rawMessage) || "未知错误";
   if (detail === "{}" || detail === '"[object Object]"') {
-    return new Error("藏酒数据库读取失败，请确认 CloudBase 已执行 cloudbase/postgresql-cellar.sql 后重试");
+    return new Error("藏酒数据库暂时无法访问，请稍后重试。若持续出现，请检查 CloudBase 服务状态与权限配置。");
   }
-  return /cellar_entries|cellar_movements|save_cellar_tasting|consume_cellar_entry|relation .*does not exist|function .*does not exist/i.test(detail)
+  return /relation .*does not exist|function .*does not exist|schema cache/i.test(detail)
     ? new Error("藏酒数据库尚未启用：请在 CloudBase SQL 工作台执行 cloudbase/postgresql-cellar.sql")
-    : error instanceof Error ? error : new Error(detail);
+    : new Error(detail);
 }
 
 export async function listCellarEntries(): Promise<CellarEntry[]> {
