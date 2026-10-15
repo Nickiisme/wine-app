@@ -887,12 +887,19 @@
 
 .select-field svg { width: 15px; height: 15px; color: #8e817a; }
 
-.option-picker { min-width: 0; max-width: 100%; padding: 2px 0 22px; outline: 0; }
+.option-picker { display: flex; flex-direction: column; min-width: 0; min-height: 0; max-width: 100%; max-height: 100%; padding: 2px 0 22px; outline: 0; }
+
+/* Searchable lists occupy a stable phone-scoped surface. The native keyboard
+   may resize the browser, but must not leave a detached sheet above it. */
+.bottom-sheet:has(.picker-search) { top: 64px; bottom: 0 !important; max-height: none !important; min-height: 0; }
+.bottom-sheet:has(.picker-search) .sheet-content { display: flex; flex: 1; flex-direction: column; min-height: 0; overflow: hidden; }
+.option-picker:has(.picker-search) { flex: 1; padding-bottom: calc(18px + var(--picker-keyboard-height, 0px)); }
+.option-picker:has(.picker-search) .picker-options { flex: 1; max-height: none; }
 
 .bottom-sheet { box-sizing: border-box; max-width: 100%; }
 .bottom-sheet .sheet-content { min-width: 0; overflow-x: hidden; }
 
-.picker-search { padding-bottom: 12px; }
+.picker-search { position: sticky; z-index: 1; top: 0; flex: none; padding-bottom: 12px; background: #fff; }
 
 .picker-search input {
   width: 100%;
@@ -910,8 +917,10 @@
 .picker-search input:focus { border-color: #9d4d67; box-shadow: 0 0 0 3px rgba(126, 22, 55, .08); }
 
 .picker-options {
+  min-height: 0;
   max-height: 300px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   border-top: 1px solid #e6ddd2;
 }
 
@@ -935,7 +944,7 @@
 .picker-options button svg { color: #7e1637; }
 .picker-empty { padding: 22px 0; color: #958983; text-align: center; font-size: 12px; }
 .multi-picker .picker-options { max-height: 330px; }
-.picker-done { width: 100%; min-height: 44px; margin-top: 12px; border: 0; border-radius: 14px; background: #7e1637; color: #fff; font-size: 13px; font-weight: 700; }
+.picker-done { flex: none; width: 100%; min-height: 44px; margin-top: 12px; border: 0; border-radius: 14px; background: #7e1637; color: #fff; font-size: 13px; font-weight: 700; }
 
 .question-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .question-title > h2 { margin-bottom: 13px; }
@@ -1169,3 +1178,37 @@
 .region-node-3 { left: 12%; top: 42%; }
 .region-node-4 { right: 8%; top: 60%; }
 .region-node-5 { left: 20%; top: 76%; }
+.wine-app .layered-atlas { min-height: 0; margin: 22px 0 0; padding-bottom: 20px; }
+.atlas-section-heading { display: flex; justify-content: space-between; align-items: baseline; margin: 20px 2px 10px; }
+.atlas-section-heading h2 { margin: 0; color: #5d1028; font-size: 18px; font-weight: 700; }
+.atlas-section-heading span { color: #8e8079; font-size: 11px; }
+.atlas-empty-copy { padding: 18px 12px; border: 1px dashed #dccfc5; border-radius: 14px; color: #8e8079; font-size: 12px; }
+.atlas-node-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 4px; }
+.wine-app .atlas-node-grid .grape-node { width: 100%; height: 128px; margin: 0; justify-content: center; }
+.wine-app .atlas-node-grid .grape-node.right { transform: translateY(12px); }
+.wine-app .atlas-node-grid .grape-node.right:active, .wine-app .atlas-node-grid .grape-node.right.pressed { transform: translateY(12px) scale(.92); }
+.wine-app .atlas-node-grid .grape-node small { font-size: 10px; }
+.wine-app .atlas-node-grid .grape-art-wrap { width: 68px; height: 68px; }
+.grape-line-art { width: 56px; height: 68px; overflow: visible; fill: none; stroke: #891f43; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.locked .grape-line-art { stroke: #8e827b; }
+.all-grapes-link { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 26px; padding: 17px; border: 1px solid #decfc4; border-radius: 15px; background: #fffaf4; color: #751735; font-size: 15px; font-weight: 700; }
+.all-grapes-link span { color: #8d7777; font-size: 11px; font-weight: 400; }
+.all-grapes-content { padding-bottom: 80px; }
+.all-grapes-chapter { margin-top: 28px; }
+.all-grapes-chapter h2 { color: #661632; font-size: 17px; margin: 0 0 8px; }
+.all-grapes-list { border-top: 1px solid #e4d9cb; }
+.all-grapes-list button { width: 100%; min-height: 69px; display: flex; align-items: center; gap: 12px; padding: 6px 3px; border: 0; border-bottom: 1px solid #e4d9cb; background: transparent; text-align: left; color: #6b1a39; }
+.all-grapes-art { width: 48px; height: 54px; display: grid; place-items: center; flex: none; }
+.all-grapes-art img { width: 48px; height: 52px; object-fit: contain; mix-blend-mode: multiply; }
+.all-grapes-art .grape-line-art { width: 37px; height: 44px; }
+.all-grapes-name { display: grid; gap: 3px; flex: 1; }
+.all-grapes-name strong { color: #3f302d; font-size: 14px; }
+.all-grapes-name small { color: #91857d; font-size: 10px; }
+.all-grapes-count { color: #8c7778; font-size: 11px; }
+.grape-comparisons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.grape-comparisons button { border: 1px solid #d8c3c6; border-radius: 20px; background: #fff8f3; color: #741a39; padding: 8px 12px; font-size: 12px; }
+.grape-detail-hero .grape-line-art { width: 72px; height: 85px; flex: none; }
+.special-discovery-notice { margin: 10px 0 16px; padding: 15px; border: 1px solid #d9bd83; border-radius: 14px; background: #fff7e6; text-align: center; }
+.special-discovery-notice small { color: #90652b; }
+.special-discovery-notice h2 { margin: 5px 0; color: #6f2036; font-size: 19px; }
+.special-discovery-notice p { margin: 0; color: #705e50; font-size: 12px; }

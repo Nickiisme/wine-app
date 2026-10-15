@@ -4,7 +4,13 @@
 
 ### Wine Explorer Product Decisions
 
+- Profile menu rows share the same single-line title typography and row height. Place drinking-activity descriptions and cellar counts on the right in small muted text before the chevron, never below the title.
+
+- Profile includes “饮酒足迹” with record-derived drinking days, tasting counts, frequency charts, and a selectable monthly calendar. Count multiple tastings on one date as one drinking day, use tasting dates, and never infer consumption volume or reward drinking streaks.
+
 - The home screen is an immersive, vertically scrolling grape atlas rather than a dashboard or task list.
+- The home grape atlas shows unlocked varieties, 6–8 rule-based exploration suggestions, and a link to a separate all-varieties page; do not render the full catalog on the home route. With no records, suggest the six beginner classics. Recommendations invite comparison and never assert a user preference.
+- The catalog has 24 data-defined core varieties in four chapters. Normalize Chinese/English aliases and count each variety at most once per record. Recognized non-core varieties enter the user's “特别发现” collection upon saving; unknown or uncertain values do not. A first special discovery gets a one-time success message, and details without vetted catalog content show only recorded facts and a pending-information message.
 - Use warm ivory paper, wine red, muted sage, generous whitespace, and small botanical grape illustrations.
 - Unlocked varieties each use a distinct, botanically differentiated illustration. Locked varieties all use one generic muted grape treatment while clearly showing the varietal name and `待探索` state.
 - Unlocking is immediate and restrained: update the node and show a short confirmation, without growth, fill, or elaborate reveal animation.
@@ -15,15 +21,18 @@
 - Do not use progress bars, percentages, streaks, checklists, lessons, coins, rankings, or persistent task cards.
 - A new tasting record starts with no year, grape, country, region, preference, body value, or flavor selected. Preserve field provenance (`user_selected`, `label_scan`, `inferred`, or `default`) and confirmation state; only explicitly confirmed data may contribute to personal preference calculations.
 - Allow low-input `quick_save` records, but require at least one photo, wine-information field, user experience field, or note. Personal feedback must use only confirmed `user_selected` experience fields; keep varietal knowledge and typical aromas visibly separate from user taste conclusions.
-- On the tasting screen, let a beginner choose body directly without an extra activation step, and give preference, body, and flavor choices clear tap feedback. Celebrate the first real tasting insight in a popup, then show the first-record commemorative badge in a separate festive popup.
+- On the tasting screen, let a beginner choose body directly without an extra activation step, and give preference, body, and flavor choices clear tap feedback. After the first record saves, show the actual “初次举杯” badge artwork immediately in the festive popup; show any first taste insight on the underlying success screen so earning the badge requires no second tap.
 - Keep the tasting screen's save action visible above the bottom safe area while the note and photos scroll; do not add decorative red dots to selected taste choices.
 - Keep the tasting screen's title and back button pinned above its scrolling questions. Do not show a generic “all fields start empty” helper on the manual confirmation screen; keep the scan-specific confirmation explanation only when a label photo exists.
 - Use the same pinned header height and top alignment on the confirmation and tasting screens. The tasting save action belongs at the bottom of the visible app viewport, including after the phone's real keyboard closes; do not let hidden preview-keyboard state lift it into the form.
 - On the region map, pinch/double-tap zoom enlarges the geography while country labels stay at a readable fixed size. Long bilingual selections and picker searches must not zoom or horizontally expand the mobile page.
+- Wine-information pickers (grapes, countries, regions) should be compact at rest, around 62% of the phone viewport with internally scrolling options; expand while searching to keep search and completion controls visible.
+- In both wine-confirmation flows, searchable pickers use a stable phone-scoped surface anchored to the bottom even while typing; do not leave a floating gap below the picker. Keep the search field visible while only the option list scrolls, and return controls to their normal positions when the real keyboard closes.
 - In Profile > Footprints, tasting records open the newest-first timeline directly. Grapes and regions first open their own record-derived summaries, then a grape or country/region opens the same timeline filtered to that selection. Summary likes and recurring flavors must come only from confirmed, user-selected experience fields.
 - The world wine footprint map keeps pinch/double-tap zoom and drag, but does not display the instructional sentence about these gestures.
 - Profile includes “我的藏酒” with in-cellar and consumed bottle counts. Cellar entries and tasting records are separate: adding cellar inventory must not light up grape/region footprints. Opening a bottle writes an immutable movement, never deletes the entry, and a cellar tasting is saved with the inventory decrement in one database transaction. Unconfirmed or unentered wine facts must not be fabricated in the cellar flow.
 - Profile badges use small, tactile hexagonal metal-and-enamel artwork inspired by the supplied badge references, adapted to the ivory, wine-red, and sage palette. Keep badge art simple and legible at phone size. Show full color only when earned; show subdued art with real progress or conditions otherwise. Badge awards come from saved records, not static display data.
+- Badge reward popups and profile badges must use the same image asset. Keep the image sized for its rendered use and the reward entrance brief so the award appears promptly after a successful save.
 
 In ChatGPT Work Mode, run `sites-preview start "$PWD"`, open `http://terminal.local:4173/` in the cloud browser, and verify the rendered app and its primary interactions. Keep that preview open and tell the user to inspect it in the cloud browser; do not present the local URL as a user-facing chat link. In Codex Desktop, run the local server yourself, open the preview in the in-app browser, and provide the clickable local URL. Do not deploy to Sites unless the user explicitly asks to share, publish, or deploy. Do not give the user server-start instructions when you can run it.
 

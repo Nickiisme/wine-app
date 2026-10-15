@@ -1,4 +1,5 @@
 import { getFeedbackEvidence, type TastingRecord } from "./tastingRecords";
+import { canonicalGrapeName, recordGrapeNames } from "./grapeCatalog";
 
 export type RecordFilter =
   | { kind: "grape"; grape: string }
@@ -26,9 +27,7 @@ export type RegionSummary = {
 };
 
 export function getRecordGrapes(record: TastingRecord) {
-  return [...new Set((record.grapes?.length ? record.grapes : record.grape.split("、"))
-    .map((grape) => grape.trim())
-    .filter((grape) => grape && grape !== "不确定"))];
+  return recordGrapeNames(record);
 }
 
 export function getRecordLocation(record: TastingRecord) {
@@ -61,7 +60,7 @@ export function sortRecordsNewestFirst(records: TastingRecord[]) {
 export function filterTastingRecords(records: TastingRecord[], filter: RecordFilter) {
   const sorted = sortRecordsNewestFirst(records);
   if (!filter) return sorted;
-  if (filter.kind === "grape") return sorted.filter((record) => getRecordGrapes(record).includes(filter.grape));
+  if (filter.kind === "grape") return sorted.filter((record) => getRecordGrapes(record).includes(canonicalGrapeName(filter.grape) ?? filter.grape));
   return sorted.filter((record) => {
     const location = getRecordLocation(record);
     return location.country === filter.country && location.region === filter.region;

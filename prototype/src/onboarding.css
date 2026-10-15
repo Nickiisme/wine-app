@@ -85,11 +85,8 @@
 .reward-popup p { margin: 0 auto; max-width: 260px; color: #73635d; font-size: 12px; line-height: 1.75; }
 .reward-popup .primary-action { margin-top: 26px; }
 .reward-overlay.badge { background: radial-gradient(circle at 50% 38%, rgba(119, 69, 39, .34), rgba(42, 24, 30, .68)); }
-.reward-overlay.badge .reward-popup { background: radial-gradient(circle at 50% 5%, #fffaf0, #f8ead4 70%, #f2dec6); animation: reward-badge-card-in 650ms cubic-bezier(.18,1.5,.3,1); }
-.reward-coin { position: relative; width: 102px; height: 102px; margin: -3px auto 18px; border-radius: 50%; display: grid; place-items: center; border: 5px double #b9863d; background: radial-gradient(circle at 30% 24%, #fff9d8, #e6b865 49%, #a76d31 100%); box-shadow: 0 0 0 7px rgba(217, 164, 69, .15), 0 13px 25px rgba(104, 57, 23, .26), inset 0 3px 6px rgba(255,255,255,.8); animation: reward-coin-pop 850ms cubic-bezier(.2,1.7,.3,1) both; }
-.reward-coin::after { content: ""; position: absolute; inset: 9px; border: 1px solid rgba(123, 74, 28, .5); border-radius: 50%; }
-.reward-coin > span { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; color: #7a4522; }
-.reward-coin svg { width: 42px; height: 42px; filter: drop-shadow(0 1px 0 rgba(255,255,255,.7)); }
+.reward-overlay.badge .reward-popup { background: radial-gradient(circle at 50% 5%, #fffaf0, #f8ead4 70%, #f2dec6); animation: reward-badge-card-in 280ms ease-out; }
+.reward-badge-art { display: block; width: 132px; height: 132px; object-fit: contain; margin: -14px auto 10px; filter: drop-shadow(0 8px 11px rgba(104, 57, 23, .18)); animation: reward-coin-pop 360ms ease-out both; }
 .reward-badge-name { display: block; margin: 1px 0 10px; color: #a26d2d; font: 700 17px Georgia, "Noto Serif SC", serif; letter-spacing: 2px; }
 .reward-confetti { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; pointer-events: none; }
 .reward-confetti i { position: absolute; width: 8px; height: 15px; border-radius: 2px; background: #d8a74e; opacity: 0; animation: reward-confetti-burst 1200ms ease-out 130ms both; }
@@ -101,7 +98,7 @@
 @keyframes reward-badge-card-in { from { opacity: 0; transform: translateY(36px) scale(.82) rotate(-4deg); } to { opacity: 1; transform: translateY(0) scale(1) rotate(0); } }
 @keyframes reward-coin-pop { 0% { opacity: 0; transform: scale(.3) rotate(-38deg); } 60% { opacity: 1; transform: scale(1.17) rotate(8deg); } 100% { opacity: 1; transform: scale(1) rotate(0); } }
 @keyframes reward-confetti-burst { 0% { opacity: 0; transform: translate(0, 0) rotate(0) scale(.4); } 18% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: .75; transform: translate(var(--x), var(--y)) rotate(var(--r)) scale(1); } }
-@media (prefers-reduced-motion: reduce) { .reward-popup, .reward-overlay, .reward-coin, .reward-confetti i, .taste-choice-row button.selected, .taste-flavor-grid button.selected, .body-choice-row button.selected { animation: none; } .taste-choice-row button, .taste-flavor-grid button, .body-choice-row button { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .reward-popup, .reward-overlay, .reward-badge-art, .reward-confetti i, .taste-choice-row button.selected, .taste-flavor-grid button.selected, .body-choice-row button.selected { animation: none; } .taste-choice-row button, .taste-flavor-grid button, .body-choice-row button { transition: none; } }
 
 @media (max-height: 720px) {
   .onboarding-content { padding-top: 38px; }

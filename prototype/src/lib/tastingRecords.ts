@@ -1,3 +1,5 @@
+import { recordGrapeNames } from "./grapeCatalog";
+
 const COLLECTION = "tasting_records";
 const PHOTO_BUCKET = "tasting-photos";
 
@@ -20,6 +22,7 @@ export type TastingRecord = {
   flavors?: string[];
   bodyLevel?: number;
   createdAt?: string;
+  tastedAtIso?: string;
   fieldMetadata?: RecordFieldMetadata;
   cellarEntryId?: string;
   cellarMovementId?: string;
@@ -70,7 +73,7 @@ function buildPersonalDescription(evidence: FeedbackEvidence) {
 
 export function buildSaveFeedback(record: TastingRecord): SaveFeedback {
   const evidence = getFeedbackEvidence(record);
-  const grapeName = record.grapes?.find((grape) => grape && grape !== "不确定") || record.grape.split("、").find((grape) => grape && grape !== "不确定");
+  const grapeName = recordGrapeNames(record)[0];
   if (evidence.mode === "tasting") {
     return { type: "personal", title: "记录了你的第一条口味线索", description: buildPersonalDescription(evidence) };
   }
@@ -141,6 +144,7 @@ function fromCloud(record: CloudRecord, photoUrls: string[] = []): TastingRecord
     flavors: record.flavors,
     bodyLevel: record.body_level,
     createdAt: record.created_at,
+    tastedAtIso: record.tasted_at,
     fieldMetadata: record.field_metadata,
     cellarEntryId: record.cellar_entry_id,
     cellarMovementId: record.cellar_movement_id,
