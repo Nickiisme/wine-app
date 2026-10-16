@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type WheelEvent as ReactWheelEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type WheelEvent as ReactWheelEvent } from "react";
 import { ArrowLeftIcon, BookmarkFilledIcon, CameraIcon, CheckCircledIcon, CheckIcon, ChevronDownIcon, DrawingPinFilledIcon, GlobeIcon, ImageIcon, LayersIcon, Pencil2Icon, PersonIcon, PlusIcon, StarFilledIcon } from "@radix-ui/react-icons";
 import { BottomSheet, Carousel, KeyboardInput, KeyboardTextarea, MobileScroll, useKeyboard, useKeyboardInsets } from "./mobile";
 import { buildKnowledgeFeedback, buildSaveFeedback, canSaveRecord, createTastingRecord, getFeedbackEvidence, listTastingRecords, type RecordFieldMetadata, type TastingRecord } from "./lib/tastingRecords";
@@ -6,6 +6,8 @@ import { filterTastingRecords, summarizeGrapes, summarizeRegions, type RecordFil
 import { trackRecordEvent, type RecordAnalyticsProperties } from "./lib/analytics";
 import { consumeCellarEntry, createCellarEntry, listCellarEntries, listCellarMovements, updateCellarEntry, type CellarEntry, type CellarInput, type CellarMovement } from "./lib/cellar";
 import { recognizeWineLabel } from "./lib/wineLabelOcr";
+import { MapCountryLayers } from "./MapCountryLayers";
+import { aggregateMapRecords, EXTRA_COUNTRIES, MAP_ZOOM, placeMapLabels, WORLD_COUNTRIES } from "./lib/mapLayers";
 import { CORE_GRAPES, GRAPE_CHAPTERS, SPECIAL_GRAPES, canonicalGrapeName, firstNewSpecialDiscovery, grapeCounts as countGrapes, recommendedGrapes, recordGrapeNames, specialDiscoveries } from "./lib/grapeCatalog";
 import { CellarConsumeScreen, CellarDetailScreen, CellarListScreen, CellarPurchaseScreen, type PurchaseDraft } from "./CellarScreens";
 import type { WineAccount } from "./lib/cloudbase";
@@ -502,7 +504,7 @@ export default function Prototype() {
   return (
     <div className="wine-app">
       {screen === "onboarding" && <OnboardingScreen onRecord={() => { rememberOnboarding(); go("explore"); openRecordChoices(); }} onExplore={() => { rememberOnboarding(); go("explore"); }} />}
-      {screen === "explore" && <ExploreScreen tab={tab} records={records} recordsLoaded={recordsLoaded} account={account} dismissedPrompt={dismissedExplorePrompt} onDismissPrompt={setDismissedExplorePrompt} onTab={setTab} onRecord={openRecordChoices} onProfile={() => go("profile")} onAllGrapes={() => go("allGrapes")} onNotes={(grape) => openRecords({ kind: "grape", grape }, "explore")} />}
+      {screen === "explore" && <ExploreScreen tab={tab} records={records} recordsLoaded={recordsLoaded} account={account} dismissedPrompt={dismissedExplorePrompt} onDismissPrompt={setDismissedExplorePrompt} onTab={setTab} onRecord={openRecordChoices} onProfile={() => go("profile")} onAllGrapes={() => go("allGrapes")} onRegionNotes={(country, region) => openRecords({ kind: "region", country, region }, "explore")} onNotes={(grape) => openRecords({ kind: "grape", grape }, "explore")} />}
       {screen === "allGrapes" && <AllGrapesScreen records={records} onBack={() => go("explore")} onNotes={(grape) => openRecords({ kind: "grape", grape }, "allGrapes")} />}
       {screen === "confirm" && <ConfirmScreen draft={draft} scanState={labelScanState} scanMessage={labelScanMessage} onChange={setDraft} onBack={() => go("explore")} onNext={() => go("taste")} />}
       {screen === "taste" && <TasteScreen liked={liked} setLiked={setLiked} selectedFlavors={selectedFlavors} toggleFlavor={(flavor) => setSelectedFlavors((current) => current.includes(flavor) ? current.filter((item) => item !== flavor) : [...current, flavor])} note={tastingNote} onNoteChange={setTastingNote} bodyLevel={bodyLevel} onBodyLevel={setBodyLevel} photos={draft.photos} existingPhotos={tastingCellar?.photos ?? []} cellarSummary={tastingCellar ? `${tastingCellar.wineName || "未命名藏酒"} · 本次 ${consumeQuantity} 瓶` : null} onCamera={() => noteCameraInput.current?.click()} onGallery={() => noteGalleryInput.current?.click()} onRemovePhoto={(id) => setDraft((current) => { const removed = current.photos.find((photo) => photo.id === id); if (removed) URL.revokeObjectURL(removed.preview); return { ...current, photos: current.photos.filter((photo) => photo.id !== id) }; })} onBack={() => go(tastingCellarId ? "cellarConsume" : "confirm")} onSave={saveTasting} canSave={recordCanBeSaved} saving={savingRecord} cloudMessage={cloudMessage} />}
@@ -548,7 +550,7 @@ function AtlasTabs({ tab, onTab, pinned = false, inactive = false }: { tab: Expl
   return <div className={`atlas-tabs ${pinned ? "atlas-tabs-pinned" : ""}`} role="tablist" aria-label={pinned ? "图鉴视图，已置顶" : "图鉴视图"} aria-hidden={inactive || undefined}><button role="tab" aria-selected={tab === "grapes"} tabIndex={inactive ? -1 : undefined} className={tab === "grapes" ? "active" : ""} onClick={() => onTab("grapes")}>品种图鉴</button><button role="tab" aria-selected={tab === "regions"} tabIndex={inactive ? -1 : undefined} className={tab === "regions" ? "active" : ""} onClick={() => onTab("regions")}>产区地图</button></div>;
 }
 
-function ExploreScreen({ tab, records, recordsLoaded, account, dismissedPrompt, onDismissPrompt, onTab, onRecord, onProfile, onAllGrapes, onNotes }: { tab: ExploreTab; records: TastingRecord[]; recordsLoaded: boolean; account: WineAccount | null; dismissedPrompt: "empty" | "first" | null; onDismissPrompt: (kind: "empty" | "first") => void; onTab: (tab: ExploreTab) => void; onRecord: () => void; onProfile: () => void; onAllGrapes: () => void; onNotes: (grape: string) => void }) {
+function ExploreScreen({ tab, records, recordsLoaded, account, dismissedPrompt, onDismissPrompt, onTab, onRecord, onProfile, onAllGrapes, onRegionNotes, onNotes }: { tab: ExploreTab; records: TastingRecord[]; recordsLoaded: boolean; account: WineAccount | null; dismissedPrompt: "empty" | "first" | null; onDismissPrompt: (kind: "empty" | "first") => void; onTab: (tab: ExploreTab) => void; onRecord: () => void; onProfile: () => void; onAllGrapes: () => void; onRegionNotes: (country: string, region: string) => void; onNotes: (grape: string) => void }) {
   const [selectedGrape, setSelectedGrape] = useState<string | null>(null);
   const [tabsPinned, setTabsPinned] = useState(false);
   const contentRef = useRef<HTMLElement>(null);
@@ -573,7 +575,7 @@ function ExploreScreen({ tab, records, recordsLoaded, account, dismissedPrompt, 
       <main ref={contentRef} className={`explore-content ${tab === "regions" ? "region-explore-content" : ""}`}>
         <header className={`welcome ${hasNoRecords ? "empty-welcome" : ""}`}><p className="eyebrow">{greeting}</p><h1>{hasNoRecords ? "每记录一种葡萄，它就会在这里被点亮。" : "你的葡萄酒世界已点亮："}</h1><p className="stats"><strong>{stats.grapeCount}</strong> 个品种 <i>·</i> <strong>{stats.regionCount}</strong> 个产区 <i>·</i> <strong>{stats.recordCount}</strong> 次品鉴</p></header>
         <div ref={tabsAnchorRef}><AtlasTabs tab={tab} onTab={onTab} inactive={tabsPinned} /></div>
-        {tab === "grapes" ? <GrapeAtlas records={records} onSelect={setSelectedGrape} onAll={onAllGrapes} /> : <RegionMap records={records} />}
+        {tab === "grapes" ? <GrapeAtlas records={records} onSelect={setSelectedGrape} onAll={onAllGrapes} /> : <RegionMap records={records} onRecords={onRegionNotes} />}
       </main>
     </MobileScroll>
     {tabsPinned && <div className="atlas-tabs-dock"><AtlasTabs tab={tab} onTab={onTab} pinned /></div>}
@@ -641,16 +643,33 @@ function getRecordStats(records: TastingRecord[]) {
   return { recordCount: records.length, grapeCount: Object.keys(grapeCounts).length, regionCount: regions.size, grapeCounts, countries };
 }
 
-function RegionMap({ records }: { records: TastingRecord[] }) {
+function RegionMap({ records, onRecords }: { records: TastingRecord[]; onRecords: (country: string, region: string) => void }) {
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
+  const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
   const [mapView, setMapView] = useState({ scale: 1, x: 0, y: 0 });
   const mapViewRef = useRef(mapView);
+  const surfaceRef = useRef<HTMLDivElement>(null);
+  const [surfaceSize, setSurfaceSize] = useState({ width: 349, height: 560 });
+  const [countryPickerOpen, setCountryPickerOpen] = useState(false);
+  const mapFrame = useRef(0);
+  const aggregates = useMemo(() => aggregateMapRecords(records), [records]);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinchStart = useRef<{ distance: number; scale: number; x: number; y: number; centerX: number; centerY: number } | null>(null);
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const moved = useRef(false);
   const lastTap = useRef(0);
-  useEffect(() => { mapViewRef.current = mapView; }, [mapView]);
+  useEffect(() => {
+    const surface = surfaceRef.current;
+    if (!surface) return;
+    const observer = new ResizeObserver(([entry]) => setSurfaceSize({ width: entry.contentRect.width, height: entry.contentRect.height }));
+    observer.observe(surface);
+    return () => observer.disconnect();
+  }, [selectedCountry]);
+  useEffect(() => () => cancelAnimationFrame(mapFrame.current), []);
+  const updateMapView = (view: typeof mapView) => {
+    mapViewRef.current = view;
+    if (!mapFrame.current) mapFrame.current = requestAnimationFrame(() => { mapFrame.current = 0; setMapView(mapViewRef.current); });
+  };
   const clampView = (scale: number, x: number, y: number) => {
     const limitX = 150 * (scale - 1);
     const limitY = 190 * (scale - 1);
@@ -658,7 +677,8 @@ function RegionMap({ records }: { records: TastingRecord[] }) {
   };
   const zoomMap = (nextScale: number) => {
     const scale = Math.max(1, Math.min(3, nextScale));
-    setMapView((current) => clampView(scale, scale === 1 ? 0 : current.x, scale === 1 ? 0 : current.y));
+    const current = mapViewRef.current;
+    updateMapView(clampView(scale, scale === 1 ? 0 : current.x, scale === 1 ? 0 : current.y));
   };
   const handleMapDoubleClick = () => zoomMap(mapViewRef.current.scale > 1 ? 1 : 2);
   const handleMapPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -682,9 +702,10 @@ function RegionMap({ records }: { records: TastingRecord[] }) {
       const centerX = (a.x + b.x) / 2;
       const centerY = (a.y + b.y) / 2;
       const scale = Math.max(1, Math.min(3, pinchStart.current.scale * distance / Math.max(1, pinchStart.current.distance)));
-      setMapView(clampView(scale, pinchStart.current.x + centerX - pinchStart.current.centerX, pinchStart.current.y + centerY - pinchStart.current.centerY));
+      updateMapView(clampView(scale, pinchStart.current.x + centerX - pinchStart.current.centerX, pinchStart.current.y + centerY - pinchStart.current.centerY));
     } else if (pointers.current.size === 1 && mapViewRef.current.scale > 1) {
-      setMapView((current) => clampView(current.scale, current.x + event.clientX - previous.x, current.y + event.clientY - previous.y));
+      const current = mapViewRef.current;
+      updateMapView(clampView(current.scale, current.x + event.clientX - previous.x, current.y + event.clientY - previous.y));
     }
   };
   const handleMapPointerEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -700,16 +721,20 @@ function RegionMap({ records }: { records: TastingRecord[] }) {
     event.preventDefault();
     zoomMap(mapViewRef.current.scale - event.deltaY * 0.01);
   };
-  const countryCounts = records.reduce<Record<string, number>>((counts, record) => { const country = record.region.split("·")[0].trim(); if (country) counts[country] = (counts[country] ?? 0) + 1; return counts; }, {});
-  const regions = [{ country: "法国", x: "48%", y: "181px" }, { country: "意大利", x: "54%", y: "215px" }, { country: "中国", x: "73%", y: "205px" }, { country: "美国", x: "19%", y: "194px" }, { country: "澳大利亚", x: "74%", y: "270px" }, { country: "新西兰", x: "83%", y: "306px" }].map((region) => ({ ...region, count: countryCounts[region.country] ?? 0 }));
-  const countryRegions: Record<string, string[]> = {
-    法国: ["香槟", "卢瓦尔河谷", "勃艮第", "波尔多", "罗讷河谷"],
-    意大利: ["皮埃蒙特", "威尼托", "托斯卡纳", "西西里"],
-    中国: ["宁夏贺兰山东麓", "新疆", "山东蓬莱", "云南香格里拉"],
-    美国: ["纳帕谷", "索诺玛", "威拉米特谷"],
-    澳大利亚: ["巴罗萨谷", "雅拉谷", "玛格丽特河"],
-    新西兰: ["马尔堡", "中奥塔哥", "霍克斯湾"],
-  };
+  const countryCounts = useMemo(() => records.reduce<Record<string, number>>((counts, record) => { const country = record.region.split("·")[0].trim(); if (country) counts[country] = (counts[country] ?? 0) + 1; return counts; }, {}), [records]);
+  const regions = WORLD_COUNTRIES.map((region) => ({ ...region, count: countryCounts[region.country] ?? 0 }));
+  const expanded = mapView.scale >= MAP_ZOOM.countries;
+  const extraCountries = useMemo(() => {
+    const known = EXTRA_COUNTRIES.filter((country) => (aggregates.get(country.country)?.count ?? 0) > 0 || mapView.scale >= country.zoom);
+    const unknown = [...aggregates.keys()].filter((name) => !WORLD_COUNTRIES.some((country) => country.country === name) && !EXTRA_COUNTRIES.some((country) => country.country === name));
+    return [...known.map((country) => ({ ...country, count: aggregates.get(country.country)?.count ?? 0 })), ...unknown.map((country) => ({ country, x: null, y: null, zoom: MAP_ZOOM.countries, count: aggregates.get(country)!.count }))].sort((a, b) => b.count - a.count);
+  }, [aggregates, mapView.scale]);
+  const extraLabels = useMemo(() => {
+    if (!expanded) return { visible: [], hidden: [] };
+    const project = (x: number, y: number) => ({ x: surfaceSize.width / 2 + (surfaceSize.width * x / 100 - surfaceSize.width / 2) * mapView.scale + mapView.x, y: surfaceSize.height / 2 + (y - surfaceSize.height / 2) * mapView.scale + mapView.y });
+    const reserved = regions.map((country) => ({ id: country.country, name: country.country, count: country.count, priority: 0, ...project(parseFloat(country.x), parseFloat(country.y)), width: country.country.length * 12 + 36, height: 30 }));
+    return placeMapLabels(extraCountries.filter((country) => country.x !== null && country.y !== null).map((country) => ({ id: country.country, name: country.country, count: country.count, priority: country.count ? 4 : 1, ...project(country.x!, country.y!) })), surfaceSize.width, surfaceSize.height, reserved);
+  }, [expanded, extraCountries, mapView, surfaceSize, records]);
   const countryFacts: Record<string, { area: string; output: string; grapes: string }> = {
     法国: { area: "约 79 万公顷", output: "约 46 亿升/年", grapes: "赤霞珠、梅洛、黑皮诺、霞多丽" },
     意大利: { area: "约 72 万公顷", output: "约 49 亿升/年", grapes: "桑娇维塞、内比奥罗、灰皮诺" },
@@ -718,8 +743,8 @@ function RegionMap({ records }: { records: TastingRecord[] }) {
     澳大利亚: { area: "约 15 万公顷", output: "约 12 亿升/年", grapes: "西拉、霞多丽、赤霞珠、雷司令" },
     新西兰: { area: "约 4.2 万公顷", output: "约 3 亿升/年", grapes: "长相思、黑皮诺、霞多丽、灰皮诺" },
   };
-  if (selectedCountry) { const facts = countryFacts[selectedCountry]; const visitedRegions = new Set(records.filter((record) => record.region.split("·")[0].trim() === selectedCountry).map((record) => record.region.split("·").slice(1).join("·").trim())); return <section className="region-map region-map-zoomed" aria-label={`${selectedCountry}葡萄酒产区地图`}><header className="region-zoom-header"><button onClick={() => setSelectedCountry(null)} aria-label="返回世界地图"><ArrowLeftIcon /></button><div><strong>{selectedCountry} · 产区地图</strong><small>国家概览与主要产区</small></div></header><div className="country-facts"><div><small>葡萄园面积</small><strong>{facts.area}</strong></div><div><small>葡萄酒年产量</small><strong>{facts.output}</strong></div><p><span>主要品种</span>{facts.grapes}</p></div><div className="region-zoom-canvas">{countryRegions[selectedCountry].map((region, index) => <button className={`region-node region-node-${index + 1}`} key={region}><span>{index + 1}</span><strong>{region}</strong><small>{visitedRegions.has(region) ? "已点亮" : "待继续探索"}</small></button>)}</div><p className="map-note">点按左上角，回到世界地图。</p></section>; }
-  return <section className="region-map" aria-label="世界葡萄酒产区地图"><div className="map-heading"><GlobeIcon /><span>我的葡萄酒足迹</span></div><div className={`map-gesture-surface ${mapView.scale > 1 ? "is-zoomed" : ""}`} data-scroll-drag="ignore" onDoubleClick={handleMapDoubleClick} onPointerDown={handleMapPointerDown} onPointerMove={handleMapPointerMove} onPointerUp={handleMapPointerEnd} onPointerCancel={handleMapPointerEnd} onWheel={handleMapWheel} aria-label="可缩放的世界葡萄酒产区地图"><div className="map-transform-layer" style={{ transform: `translate3d(${mapView.x}px, ${mapView.y}px, 0) scale(${mapView.scale})` }}><img className="world-map-art" src={asset("assets/maps/world-wine-map.webp")} alt="世界葡萄酒产区地图" draggable={false} loading="lazy" decoding="async" />{regions.map((region) => <button className="region-pin" style={{ left: region.x, top: region.y, transform: `scale(${1 / mapView.scale}) translate(-50%, -50%)` }} key={region.country} onClick={() => { if (!moved.current) setSelectedCountry(region.country); }}><span>{region.count}</span>{region.country}</button>)}</div></div>{mapView.scale > 1 && <button className="map-reset" onClick={() => zoomMap(1)} aria-label="还原地图缩放">还原</button>}</section>;
+  if (selectedCountry) return <MapCountryLayers key={selectedCountry} country={selectedCountry} records={records} facts={countryFacts[selectedCountry]} selectedRegion={selectedRegion} onRegion={setSelectedRegion} onBack={() => { zoomMap(1); setSelectedRegion(null); setSelectedCountry(null); }} onRecords={onRecords} />;
+  return <><section className="region-map" aria-label="世界葡萄酒产区地图"><div className="map-heading"><GlobeIcon /><span>我的葡萄酒足迹</span></div><div ref={surfaceRef} className={`map-gesture-surface ${mapView.scale > 1 ? "is-zoomed" : ""}`} data-scroll-drag="ignore" onDoubleClick={handleMapDoubleClick} onPointerDown={handleMapPointerDown} onPointerMove={handleMapPointerMove} onPointerUp={handleMapPointerEnd} onPointerCancel={handleMapPointerEnd} onWheel={handleMapWheel} aria-label="可缩放的世界葡萄酒产区地图"><div className="map-transform-layer" style={{ transform: `translate3d(${mapView.x}px, ${mapView.y}px, 0) scale(${mapView.scale})` }}><img className="world-map-art" src={asset("assets/maps/world-wine-map.webp")} alt="世界葡萄酒产区地图" draggable={false} loading="lazy" decoding="async" />{regions.map((region) => <button className="region-pin" style={{ left: region.x, top: region.y, transform: `scale(${1 / mapView.scale}) translate(-50%, -50%)` }} key={region.country} onClick={() => { if (!moved.current) setSelectedCountry(region.country); }}><span>{region.count}</span>{region.country}</button>)}</div>{expanded && <div className="map-extra-labels">{extraLabels.visible.map((label) => <button key={label.id} className={`map-extra-pin ${label.count ? "is-lit" : ""}`} style={{ left: label.x, top: label.y, width: label.width }} onPointerDown={(event) => { event.stopPropagation(); moved.current = false; }} onClick={() => { if (!moved.current) setSelectedCountry(label.name); }}><span>{label.count}</span>{label.name}</button>)}</div>}</div>{expanded && <button className="map-more-countries" onClick={() => setCountryPickerOpen(true)}>更多国家 · {extraCountries.length}</button>}{mapView.scale > 1 && <button className="map-reset" onClick={() => zoomMap(1)} aria-label="还原地图缩放">还原</button>}</section><BottomSheet open={expanded && countryPickerOpen} onOpenChange={setCountryPickerOpen} title="继续探索葡萄酒国家" description="有记录的国家优先展示" snap={0.7}><div className="map-country-choices">{extraCountries.map((country) => <button key={country.country} onClick={() => { setCountryPickerOpen(false); setSelectedCountry(country.country); }}><strong>{country.country}</strong><span>{country.count} 次 · {country.count ? "已点亮" : "待探索"}</span></button>)}</div></BottomSheet></>;
 }
 
 function ConfirmScreen({ draft, scanState, scanMessage, onChange, onBack, onNext }: { draft: WineDraft; scanState: LabelScanState; scanMessage: string | null; onChange: (draft: WineDraft) => void; onBack: () => void; onNext: () => void }) {
