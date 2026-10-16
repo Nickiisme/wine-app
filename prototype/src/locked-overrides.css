@@ -1216,7 +1216,7 @@
 .map-layer-controls button { width: 28px; height: 28px; border: 1px solid #dacbbb; border-radius: 50%; background: #fffaf4; color: #7e1637; font-size: 18px; }
 .map-layer-controls button:disabled { opacity: .35; }
 .map-layer-controls span { color: #8e8079; font-size: 11px; }
-.map-country-body { position: absolute; inset: 116px 12px 20px; touch-action: pan-y; }
+.map-country-body { position: absolute; inset: 76px 12px 20px; touch-action: pan-y; }
 .map-country-scroll { height: 100%; }
 .map-country-content { padding: 2px 5px 28px; }
 .map-country-facts { font-size: 10px; color: #8e8079; line-height: 1.7; margin-bottom: 16px; }
