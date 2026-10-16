@@ -555,6 +555,7 @@ function ExploreScreen({ tab, records, recordsLoaded, account, dismissedPrompt, 
   const [tabsPinned, setTabsPinned] = useState(false);
   const contentRef = useRef<HTMLElement>(null);
   const tabsAnchorRef = useRef<HTMLDivElement>(null);
+  const [regionViewport, setRegionViewport] = useState({ height: 0, collapse: 0 });
   const stats = getRecordStats(records);
   const hasNoRecords = recordsLoaded && stats.recordCount === 0;
   const hasFirstRecord = stats.recordCount === 1;
@@ -570,9 +571,22 @@ function ExploreScreen({ tab, records, recordsLoaded, account, dismissedPrompt, 
     const frame = window.requestAnimationFrame(updatePinned);
     return () => { scroll.removeEventListener("scroll", updatePinned); window.cancelAnimationFrame(frame); };
   }, [tab, recordsLoaded, records.length]);
+  useEffect(() => {
+    if (tab !== "regions") return;
+    const content = contentRef.current;
+    const scroll = content?.closest<HTMLElement>(".mobile-scroll");
+    const anchor = tabsAnchorRef.current;
+    if (!content || !scroll || !anchor) return;
+    const measure = () => setRegionViewport({ height: scroll.clientHeight, collapse: anchor.offsetTop });
+    const observer = new ResizeObserver(measure);
+    observer.observe(scroll);
+    observer.observe(anchor);
+    measure();
+    return () => observer.disconnect();
+  }, [tab, recordsLoaded, records.length]);
   return <>
     <MobileScroll className={`app-scroll paper-screen ${tab === "regions" ? "region-page" : ""}`}>
-      <main ref={contentRef} className={`explore-content ${tab === "regions" ? "region-explore-content" : ""}`}>
+      <main ref={contentRef} className={`explore-content ${tab === "regions" ? "region-explore-content" : ""}`} style={tab === "regions" && regionViewport.height ? { "--region-viewport-height": `${regionViewport.height}px`, "--region-collapse-distance": `${regionViewport.collapse}px` } as CSSProperties : undefined}>
         <header className={`welcome ${hasNoRecords ? "empty-welcome" : ""}`}><p className="eyebrow">{greeting}</p><h1>{hasNoRecords ? "每记录一种葡萄，它就会在这里被点亮。" : "你的葡萄酒世界已点亮："}</h1><p className="stats"><strong>{stats.grapeCount}</strong> 个品种 <i>·</i> <strong>{stats.regionCount}</strong> 个产区 <i>·</i> <strong>{stats.recordCount}</strong> 次品鉴</p></header>
         <div ref={tabsAnchorRef}><AtlasTabs tab={tab} onTab={onTab} inactive={tabsPinned} /></div>
         {tab === "grapes" ? <GrapeAtlas records={records} onSelect={setSelectedGrape} onAll={onAllGrapes} /> : <RegionMap records={records} onRecords={onRegionNotes} />}
@@ -687,6 +701,7 @@ function RegionMap({ records, onRecords }: { records: TastingRecord[]; onRecords
     pointerStart.current = { x: event.clientX, y: event.clientY };
     moved.current = false;
     if (pointers.current.size === 2) {
+      event.stopPropagation();
       const [a, b] = [...pointers.current.values()];
       pinchStart.current = { distance: Math.hypot(a.x - b.x, a.y - b.y), scale: mapViewRef.current.scale, x: mapViewRef.current.x, y: mapViewRef.current.y, centerX: (a.x + b.x) / 2, centerY: (a.y + b.y) / 2 };
     }
@@ -697,6 +712,7 @@ function RegionMap({ records, onRecords }: { records: TastingRecord[]; onRecords
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (pointerStart.current && Math.hypot(event.clientX - pointerStart.current.x, event.clientY - pointerStart.current.y) > 7) moved.current = true;
     if (pointers.current.size === 2 && pinchStart.current) {
+      event.stopPropagation();
       const [a, b] = [...pointers.current.values()];
       const distance = Math.hypot(a.x - b.x, a.y - b.y);
       const centerX = (a.x + b.x) / 2;
@@ -744,7 +760,7 @@ function RegionMap({ records, onRecords }: { records: TastingRecord[]; onRecords
     新西兰: { area: "约 4.2 万公顷", output: "约 3 亿升/年", grapes: "长相思、黑皮诺、霞多丽、灰皮诺" },
   };
   if (selectedCountry) return <MapCountryLayers key={selectedCountry} country={selectedCountry} records={records} facts={countryFacts[selectedCountry]} selectedRegion={selectedRegion} onRegion={setSelectedRegion} onBack={() => { zoomMap(1); setSelectedRegion(null); setSelectedCountry(null); }} onRecords={onRecords} />;
-  return <><section className="region-map" aria-label="世界葡萄酒产区地图"><div className="map-heading"><GlobeIcon /><span>我的葡萄酒足迹</span></div><div ref={surfaceRef} className={`map-gesture-surface ${mapView.scale > 1 ? "is-zoomed" : ""}`} data-scroll-drag="ignore" onDoubleClick={handleMapDoubleClick} onPointerDown={handleMapPointerDown} onPointerMove={handleMapPointerMove} onPointerUp={handleMapPointerEnd} onPointerCancel={handleMapPointerEnd} onWheel={handleMapWheel} aria-label="可缩放的世界葡萄酒产区地图"><div className="map-transform-layer" style={{ transform: `translate3d(${mapView.x}px, ${mapView.y}px, 0) scale(${mapView.scale})` }}><img className="world-map-art" src={asset("assets/maps/world-wine-map.webp")} alt="世界葡萄酒产区地图" draggable={false} loading="lazy" decoding="async" />{regions.map((region) => <button className="region-pin" style={{ left: region.x, top: region.y, transform: `scale(${1 / mapView.scale}) translate(-50%, -50%)` }} key={region.country} onClick={() => { if (!moved.current) setSelectedCountry(region.country); }}><span>{region.count}</span>{region.country}</button>)}</div>{expanded && <div className="map-extra-labels">{extraLabels.visible.map((label) => <button key={label.id} className={`map-extra-pin ${label.count ? "is-lit" : ""}`} style={{ left: label.x, top: label.y, width: label.width }} onPointerDown={(event) => { event.stopPropagation(); moved.current = false; }} onClick={() => { if (!moved.current) setSelectedCountry(label.name); }}><span>{label.count}</span>{label.name}</button>)}</div>}</div>{expanded && <button className="map-more-countries" onClick={() => setCountryPickerOpen(true)}>更多国家 · {extraCountries.length}</button>}{mapView.scale > 1 && <button className="map-reset" onClick={() => zoomMap(1)} aria-label="还原地图缩放">还原</button>}</section><BottomSheet open={expanded && countryPickerOpen} onOpenChange={setCountryPickerOpen} title="继续探索葡萄酒国家" description="有记录的国家优先展示" snap={0.7}><div className="map-country-choices">{extraCountries.map((country) => <button key={country.country} onClick={() => { setCountryPickerOpen(false); setSelectedCountry(country.country); }}><strong>{country.country}</strong><span>{country.count} 次 · {country.count ? "已点亮" : "待探索"}</span></button>)}</div></BottomSheet></>;
+  return <><section className="region-map" aria-label="世界葡萄酒产区地图"><div className="map-heading"><GlobeIcon /><span>我的葡萄酒足迹</span></div><div ref={surfaceRef} className={`map-gesture-surface ${mapView.scale > 1 ? "is-zoomed" : ""}`} data-scroll-drag={mapView.scale > 1 ? "ignore" : undefined} onDoubleClick={handleMapDoubleClick} onPointerDown={handleMapPointerDown} onPointerMove={handleMapPointerMove} onPointerUp={handleMapPointerEnd} onPointerCancel={handleMapPointerEnd} onLostPointerCapture={(event) => { pointers.current.delete(event.pointerId); pinchStart.current = null; }} onWheel={handleMapWheel} aria-label="可缩放的世界葡萄酒产区地图"><div className="map-transform-layer" style={{ transform: `translate3d(${mapView.x}px, ${mapView.y}px, 0) scale(${mapView.scale})` }}><img className="world-map-art" src={asset("assets/maps/world-wine-map.webp")} alt="世界葡萄酒产区地图" draggable={false} loading="lazy" decoding="async" />{regions.map((region) => <button className="region-pin" style={{ left: region.x, top: region.y, transform: `scale(${1 / mapView.scale}) translate(-50%, -50%)` }} key={region.country} onClick={() => { if (!moved.current) setSelectedCountry(region.country); }}><span>{region.count}</span>{region.country}</button>)}</div>{expanded && <div className="map-extra-labels">{extraLabels.visible.map((label) => <button key={label.id} className={`map-extra-pin ${label.count ? "is-lit" : ""}`} style={{ left: label.x, top: label.y, width: label.width }} onPointerDown={(event) => { event.stopPropagation(); moved.current = false; }} onClick={() => { if (!moved.current) setSelectedCountry(label.name); }}><span>{label.count}</span>{label.name}</button>)}</div>}</div>{expanded && <button className="map-more-countries" onClick={() => setCountryPickerOpen(true)}>更多国家 · {extraCountries.length}</button>}{mapView.scale > 1 && <button className="map-reset" onClick={() => zoomMap(1)} aria-label="还原地图缩放">还原</button>}</section><BottomSheet open={expanded && countryPickerOpen} onOpenChange={setCountryPickerOpen} title="继续探索葡萄酒国家" description="有记录的国家优先展示" snap={0.7}><div className="map-country-choices">{extraCountries.map((country) => <button key={country.country} onClick={() => { setCountryPickerOpen(false); setSelectedCountry(country.country); }}><strong>{country.country}</strong><span>{country.count} 次 · {country.count ? "已点亮" : "待探索"}</span></button>)}</div></BottomSheet></>;
 }
 
 function ConfirmScreen({ draft, scanState, scanMessage, onChange, onBack, onNext }: { draft: WineDraft; scanState: LabelScanState; scanMessage: string | null; onChange: (draft: WineDraft) => void; onBack: () => void; onNext: () => void }) {

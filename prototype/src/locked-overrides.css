@@ -486,21 +486,21 @@
 .region-map .region-pin { z-index: 3; white-space: nowrap; transform-origin: top left; }
 .region-map:not(.region-map-zoomed) { min-height: 470px; }
 
-.region-page .mobile-scroll { overflow-y: hidden; }
+.region-page > .mobile-scroll { overflow-y: auto; }
 .region-page .mobile-scroll-content { transform: none !important; }
 .region-page .mobile-scrollbar { display: none; }
 
 .wine-app .region-explore-content {
   box-sizing: border-box;
-  height: 100dvh;
-  min-height: 0;
+  height: auto;
+  min-height: calc(var(--region-viewport-height, 100dvh) + var(--region-collapse-distance, 0px));
   padding-bottom: 82px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .region-explore-content .region-map,
 .region-explore-content .region-map.region-map-zoomed {
-  height: clamp(260px, calc(100dvh - 301px), 560px);
+  height: max(260px, calc(var(--region-viewport-height, 100dvh) - 165px));
   min-height: 0;
 }
 

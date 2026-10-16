@@ -38,6 +38,10 @@
 .cellar-form .cellar-note-field { display: block; padding: 17px 0; }
 .cellar-note-field textarea { margin-top: 10px; min-height: 84px; padding: 9px; border: 1px solid #e2d9cd; border-radius: 12px; background: #fffaf3; line-height: 1.5; text-align: left; resize: vertical; }
 .cellar-form-page .primary-action { margin-top: 25px; }
+.cellar-purchase-page { padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
+.cellar-purchase-save-bar { position: absolute; z-index: 12; left: 0; right: 0; box-sizing: border-box; padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px)); background: rgba(251, 247, 239, .97); border-top: 1px solid rgba(102, 83, 73, .12); box-shadow: 0 -8px 22px rgba(65, 44, 37, .04); backdrop-filter: blur(10px); }
+.cellar-purchase-save-bar .primary-action { margin-top: 0; }
+.cellar-purchase-save-bar .cellar-error { margin: 0 0 10px; }
 .cellar-detail-photo { width: 100%; max-height: 265px; border-radius: 20px; object-fit: cover; }
 .cellar-detail-title { margin: 16px 0 26px; }
 .cellar-detail-title > small { color: #7e1637; font-size: 11px; }

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeftIcon, CameraIcon, ChevronRightIcon, PlusIcon } from "@radix-ui/react-icons";
-import { KeyboardInput, KeyboardTextarea, MobileScroll } from "./mobile";
+import { KeyboardInput, KeyboardTextarea, MobileScroll, useKeyboardInsets } from "./mobile";
 import type { CellarEntry, CellarMovement } from "./lib/cellar";
 import "./cellar.css";
 
@@ -33,12 +33,34 @@ export function CellarListScreen({ entries, loading, error, onBack, onAdd, onOpe
 }
 
 export function CellarPurchaseScreen({ wineName, photo, draft, onChange, onBack, onSave, saving, error, editing, remaining }: { wineName: string; photo?: string; draft: PurchaseDraft; onChange: (draft: PurchaseDraft) => void; onBack: () => void; onSave: () => void; saving: boolean; error: string | null; editing: boolean; remaining?: number }) {
+  const { bottomInset } = useKeyboardInsets();
+  const [saveInset, setSaveInset] = useState(0);
+  useEffect(() => {
+    const updateInset = () => {
+      const previewKeyboard = document.querySelector<HTMLElement>(".keyboard-dock");
+      if (previewKeyboard && getComputedStyle(previewKeyboard).display !== "none") { setSaveInset(bottomInset); return; }
+      const app = document.querySelector<HTMLElement>(".wine-app");
+      const viewport = window.visualViewport;
+      const visibleBottom = (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight);
+      const obscured = Math.max(0, (app?.getBoundingClientRect().bottom ?? visibleBottom) - visibleBottom);
+      setSaveInset(obscured >= 80 ? Math.round(obscured) : 0);
+    };
+    updateInset();
+    window.visualViewport?.addEventListener("resize", updateInset);
+    window.visualViewport?.addEventListener("scroll", updateInset);
+    window.addEventListener("resize", updateInset);
+    return () => {
+      window.visualViewport?.removeEventListener("resize", updateInset);
+      window.visualViewport?.removeEventListener("scroll", updateInset);
+      window.removeEventListener("resize", updateInset);
+    };
+  }, [bottomInset]);
   const set = (changes: Partial<PurchaseDraft>) => onChange({ ...draft, ...changes });
-  return <><CellarHeader title="记录购买信息" onBack={onBack} /><MobileScroll className="app-scroll paper-screen"><main className="flow-content record-flow-content cellar-page cellar-form-page">
+  return <><CellarHeader title="记录购买信息" onBack={onBack} /><MobileScroll className="app-scroll paper-screen"><main className="flow-content record-flow-content cellar-page cellar-form-page cellar-purchase-page">
     <div className="cellar-wine-preview">{photo && <img src={photo} alt="藏酒照片" />}<span><small>{editing ? "编辑这瓶酒" : "即将加入藏酒"}</small><strong>{wineName || "未命名藏酒"}</strong></span></div>
     <div className="cellar-form"><label><span>购买日期</span><KeyboardInput type="date" value={draft.purchaseDate} onChange={(event) => set({ purchaseDate: event.currentTarget.value })} /></label><label><span>单瓶价格 <small>选填</small></span><KeyboardInput inputMode="decimal" value={draft.purchasePrice} onChange={(event) => set({ purchasePrice: event.currentTarget.value })} placeholder="未填写" /></label><label><span>币种</span><select value={draft.currency} onChange={(event) => set({ currency: event.currentTarget.value })} aria-label="币种"><option value="CNY">人民币 CNY</option><option value="USD">美元 USD</option><option value="EUR">欧元 EUR</option><option value="GBP">英镑 GBP</option><option value="AUD">澳元 AUD</option><option value="NZD">新西兰元 NZD</option><option value="JPY">日元 JPY</option><option value="HKD">港币 HKD</option></select></label><label><span>{editing ? "当前在藏" : "购买数量"}</span>{editing ? <strong>{remaining} 瓶</strong> : <KeyboardInput inputMode="numeric" value={draft.quantity} onChange={(event) => set({ quantity: event.currentTarget.value })} aria-label="购买数量" />}</label><label><span>购买渠道 <small>选填</small></span><KeyboardInput value={draft.purchaseChannel} onChange={(event) => set({ purchaseChannel: event.currentTarget.value })} placeholder="酒庄、门店或平台" /></label><label><span>存放位置 <small>选填</small></span><KeyboardInput value={draft.storageLocation} onChange={(event) => set({ storageLocation: event.currentTarget.value })} placeholder="例如：家中酒柜" /></label><label className="cellar-note-field"><span>备注 <small>选填</small></span><KeyboardTextarea value={draft.notes} onChange={(event) => set({ notes: event.currentTarget.value })} placeholder="记下这瓶酒的故事……" rows={3} /></label></div>
-    {editing && <p className="cellar-consume-hint">为保留出入库历史，已购买数量不可在编辑时修改。</p>}{error && <p className="cellar-error" role="alert">{error}</p>}<button className="primary-action" disabled={saving} onClick={onSave}>{saving ? "正在保存…" : editing ? "保存修改" : "加入我的藏酒"}</button>
-  </main></MobileScroll></>;
+    {editing && <p className="cellar-consume-hint">为保留出入库历史，已购买数量不可在编辑时修改。</p>}
+  </main></MobileScroll><div className="cellar-purchase-save-bar" style={{ bottom: saveInset }}>{error && <p className="cellar-error" role="alert">{error}</p>}<button className="primary-action" disabled={saving} onClick={onSave}>{saving ? "正在保存…" : editing ? "保存修改" : "加入我的藏酒"}</button></div></>;
 }
 
 export function CellarDetailScreen({ entry, movements, onBack, onOpen, onEdit }: { entry: CellarEntry; movements: CellarMovement[]; onBack: () => void; onOpen: () => void; onEdit: () => void }) {

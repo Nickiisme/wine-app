@@ -16,6 +16,7 @@
 - Unlocking is immediate and restrained: update the node and show a short confirmation, without growth, fill, or elaborate reveal animation.
 - Keep bottom navigation to Explore, a central record action, and Profile. Explore switches between the grape atlas and region map.
 - Keep the grape-atlas / region-map switcher sticky at the top after the user scrolls past the home greeting.
+- The region-map tab supports scrolling the greeting out of view until the atlas tabs pin at the top, exposing a taller map. At world scale, a vertical swipe on the map may scroll the page; at enlarged scales, drag continues to pan the map. Cellar purchase forms keep their save/add action in a separate bottom bar that clears the visible keyboard and safe area.
 - Present stage-based guidance such as “light up your first grape” and “explore your next glass” as dismissible phone-scoped overlays, not inline cards that interrupt the atlas layout.
 - When a guest opens Settings, lead directly with separate Login and Register choices. Do not show cloud-sync, data-ownership, or other signed-in account-management details until the user is authenticated.
 - Do not use progress bars, percentages, streaks, checklists, lessons, coins, rankings, or persistent task cards.
