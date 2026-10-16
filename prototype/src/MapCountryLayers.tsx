@@ -12,12 +12,12 @@ type Props = {
 };
 
 const COUNTRY_MAP_ART: Record<string, string> = {
-  法国: "france-wine-map.png",
-  意大利: "italy-wine-map.png",
-  中国: "china-wine-map.png",
-  美国: "usa-wine-map.png",
-  澳大利亚: "australia-wine-map.png",
-  新西兰: "new-zealand-wine-map.png",
+  法国: "france-wine-map.webp",
+  意大利: "italy-wine-map.webp",
+  中国: "china-wine-map.webp",
+  美国: "usa-wine-map.webp",
+  澳大利亚: "australia-wine-map.webp",
+  新西兰: "new-zealand-wine-map.webp",
 };
 
 export function MapCountryLayers({ country, records, selectedRegion, facts, onBack, onRegion, onRecords }: Props) {
