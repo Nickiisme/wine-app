@@ -598,18 +598,25 @@ function GrapeDetailSheet({ name, records, onClose, onNotes, onCompare }: { name
   </BottomSheet>;
 }
 
+const HOME_GRAPE_ORDER = ["赤霞珠", "梅洛", "黑皮诺", "霞多丽", "长相思", "雷司令", "西拉", "歌海娜", "桑娇维塞"];
+
 function GrapeAtlas({ records, onSelect, onAll }: { records: TastingRecord[]; onSelect: (grape: string) => void; onAll: () => void }) {
   const [pressed, setPressed] = useState<string | null>(null);
   const counts = countGrapes(records);
-  const unlocked = [...CORE_GRAPES.map((grape) => grape.chinese_name), ...specialDiscoveries(records)].filter((name) => counts[name] > 0);
-  const recommendations = recommendedGrapes(records);
+  const latestGrape = records[0] ? recordGrapeNames(records[0])[0] : undefined;
+  const coreNames = CORE_GRAPES.map((grape) => grape.chinese_name);
+  const names = [...HOME_GRAPE_ORDER, ...coreNames.filter((name) => !HOME_GRAPE_ORDER.includes(name)), ...specialDiscoveries(records)];
+  const atlasHeight = Math.max(1040, names.length * 113 + 24);
+  const pathHeight = Math.max(940, atlasHeight - 100);
   const choose = (name: string) => { setPressed(name); window.setTimeout(() => { setPressed(null); onSelect(name); }, 190); };
-  const renderNode = (name: string, index: number, locked: boolean) => {
+  const renderNode = (name: string, index: number) => {
     const core = CORE_GRAPES.find((grape) => grape.chinese_name === name);
     const special = SPECIAL_GRAPES.find((grape) => grape.chinese_name === name);
-    return <button key={name} onClick={() => choose(name)} className={`grape-node ${index % 2 ? "right" : "left"} ${locked ? "locked" : ""} ${pressed === name ? "pressed" : ""}`} aria-label={`${name}${locked ? "，待探索" : `，品鉴过${counts[name]}次`}`}><span className="grape-art-wrap"><GrapeIllustration name={name} image={core?.image} locked={locked} />{!locked && <span className="taste-count">{formatCount(counts[name])}</span>}</span><strong>{name}</strong><small>{special ? "特别发现" : core?.english_name}{locked ? " · 待探索" : ""}</small></button>;
+    const locked = !counts[name];
+    const recent = latestGrape === name;
+    return <button key={name} onClick={() => choose(name)} className={`grape-node ${index % 2 ? "right" : "left"} ${locked ? "locked" : ""} ${recent ? "recent" : ""} ${pressed === name ? "pressed" : ""}`} aria-label={`${name}${locked ? "，待探索" : `，品鉴过${counts[name]}次`}`}><span className="grape-art-wrap"><GrapeIllustration name={name} image={core?.image} locked={locked} />{!locked && <span className="taste-count">{formatCount(counts[name])}</span>}{recent && <span className="recent-spark">✦</span>}{locked && <span className="locked-mark">?</span>}</span><strong>{name}</strong><small>{special ? "特别发现" : core?.english_name}{locked ? " · 待探索" : ""}</small></button>;
   };
-  return <section className="grape-atlas layered-atlas" aria-label="葡萄品种探索图鉴"><div className="atlas-section-heading"><h2>已点亮品种</h2><span>{unlocked.length} 种</span></div>{unlocked.length ? <div className="atlas-node-grid">{unlocked.map((name, index) => renderNode(name, index, false))}</div> : <p className="atlas-empty-copy">第一杯之后，你点亮的品种会出现在这里。</p>}<div className="atlas-section-heading"><h2>推荐探索</h2><span>可以比较不同风格</span></div><div className="atlas-node-grid">{recommendations.map((grape, index) => renderNode(grape.chinese_name, index, true))}</div><button className="all-grapes-link" onClick={onAll}>查看全部品种 <span>24 种核心葡萄 ›</span></button></section>;
+  return <section className="grape-atlas" style={{ minHeight: atlasHeight }} aria-label="葡萄品种探索路径"><svg className="path-line" style={{ height: pathHeight }} viewBox="0 0 180 940" preserveAspectRatio="none" aria-hidden="true"><path d="M88 4 C158 72 154 150 86 220 S18 365 92 438 S156 580 82 650 S20 794 92 936" /></svg>{names.map(renderNode)}<button className="all-grapes-link atlas-path-link" onClick={onAll}>查看全部品种 <span>24 种核心葡萄 ›</span></button></section>;
 }
 
 function AllGrapesScreen({ records, onBack, onNotes }: { records: TastingRecord[]; onBack: () => void; onNotes: (grape: string) => void }) {
