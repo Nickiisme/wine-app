@@ -1,10 +1,20 @@
 import { recordGrapeNames } from "./grapeCatalog";
+import { localDate, validateTastingDate } from "./tastingDates";
 
 const COLLECTION = "tasting_records";
 const PHOTO_BUCKET = "tasting-photos";
 
 async function getCloudbase() {
   return import("./cloudbase");
+}
+
+async function requireLifecycleSchema() {
+  const { getCloudbasePostgres } = await getCloudbase();
+  const { error } = await getCloudbasePostgres().from(COLLECTION).select("tasted_on,deleted_at,updated_at").limit(0);
+  if (error) {
+    if (/tasted_on|deleted_at|updated_at/i.test(error.message ?? "")) throw new Error("请先部署品鉴记录数据库迁移 postgresql-record-lifecycle.sql");
+    throw error;
+  }
 }
 
 export type TastingRecord = {
@@ -23,6 +33,10 @@ export type TastingRecord = {
   bodyLevel?: number;
   createdAt?: string;
   tastedAtIso?: string;
+  tastedOn?: string;
+  updatedAt?: string;
+  deletedAt?: string;
+  photoIds?: string[];
   fieldMetadata?: RecordFieldMetadata;
   cellarEntryId?: string;
   cellarMovementId?: string;
@@ -114,6 +128,9 @@ type CloudRecord = {
   flavors?: string[];
   body_level?: number;
   tasted_at?: string;
+  tasted_on?: string;
+  updated_at?: string;
+  deleted_at?: string;
   created_at?: string;
   field_metadata?: RecordFieldMetadata;
   cellar_entry_id?: string;
@@ -137,7 +154,7 @@ function fromCloud(record: CloudRecord, photoUrls: string[] = []): TastingRecord
     year: record.vintage,
     country: record.country,
     region: record.region,
-    date: formatRecordDate(record.tasted_at ?? record.created_at),
+    date: formatRecordDate(record.tasted_on ? `${record.tasted_on}T12:00:00` : record.tasted_at ?? record.created_at),
     note: record.note ?? "",
     photos: photoUrls,
     preference: record.preference,
@@ -145,6 +162,10 @@ function fromCloud(record: CloudRecord, photoUrls: string[] = []): TastingRecord
     bodyLevel: record.body_level,
     createdAt: record.created_at,
     tastedAtIso: record.tasted_at,
+    tastedOn: record.tasted_on,
+    updatedAt: record.updated_at,
+    deletedAt: record.deleted_at,
+    photoIds: record.photo_ids ?? [],
     fieldMetadata: record.field_metadata,
     cellarEntryId: record.cellar_entry_id,
     cellarMovementId: record.cellar_movement_id,
@@ -213,14 +234,16 @@ export async function listTastingRecords(): Promise<TastingRecord[]> {
   const userId = await ensureCloudbaseUser();
   const db = getCloudbasePostgres();
   const pageSize = 100;
-  const fetchAll = async (columns: string) => {
+  const fetchAll = async (columns: string, supportsDeletion = true) => {
     const result: CloudRecord[] = [];
     for (let from = 0; ; from += pageSize) {
-      const { data, error } = await db
+      let query = db
         .from(COLLECTION)
         .select(columns)
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
+        .eq("user_id", userId);
+      if (supportsDeletion) query = query.is("deleted_at", null);
+      const { data, error } = await query
+        .order("tasted_at", { ascending: false })
         .order("id", { ascending: false })
         .range(from, from + pageSize - 1);
       if (error) throw error;
@@ -231,17 +254,13 @@ export async function listTastingRecords(): Promise<TastingRecord[]> {
   };
   let cloudRecords: CloudRecord[];
   try {
-    cloudRecords = await fetchAll("id,user_id,grape,grapes,wine_name,vintage,country,region,photo_ids,note,preference,flavors,body_level,field_metadata,tasted_at,created_at,cellar_entry_id,cellar_movement_id");
+    cloudRecords = await fetchAll("*");
   } catch (error) {
-    // Remain readable before the optional metadata migration has been applied.
-    const message = error && typeof error === "object" && "message" in error ? String(error.message) : String(error);
-    if (!/grapes|field_metadata|cellar_entry_id|cellar_movement_id|column/i.test(message)) throw error;
-    try {
-      cloudRecords = await fetchAll("id,user_id,grape,grapes,wine_name,vintage,country,region,photo_ids,note,preference,flavors,body_level,field_metadata,tasted_at,created_at");
-    } catch (legacyError) {
-      if (!/grapes|field_metadata|column/i.test(String(legacyError))) throw legacyError;
-      cloudRecords = await fetchAll("id,user_id,grape,wine_name,vintage,country,region,photo_ids,note,preference,flavors,body_level,tasted_at,created_at");
-    }
+    // Only a confirmed missing deletion column permits the legacy read path.
+    // Never fall back on a network or permission error and expose deleted records.
+    const detail = error as { message?: string; code?: string };
+    if (!/deleted_at/.test(detail.message ?? "") || !["42703", "PGRST204"].includes(detail.code ?? "")) throw error;
+    cloudRecords = await fetchAll("*", false);
   }
   const photoUrls = await resolvePhotoUrls(cloudRecords);
   return cloudRecords.map((record) => fromCloud(record, (record.photo_ids ?? []).map((id) => photoUrls.get(id)).filter((url): url is string => Boolean(url))));
@@ -252,7 +271,9 @@ export async function createTastingRecord(
 ): Promise<TastingRecord> {
   const { ensureCloudbaseUser, getCloudbasePostgres } = await getCloudbase();
   const userId = await ensureCloudbaseUser();
-  const tastedAt = (record.tastedAt ?? new Date()).toISOString();
+  const tastedOn = validateTastingDate(record.tastedOn ?? localDate(record.tastedAt ?? new Date()));
+  await requireLifecycleSchema();
+  const tastedAt = new Date(`${tastedOn}T12:00:00`).toISOString();
   const createdAt = new Date().toISOString();
   const id = crypto.randomUUID();
   const db = getCloudbasePostgres();
@@ -281,6 +302,7 @@ export async function createTastingRecord(
     body_level: record.bodyLevel,
     field_metadata: record.fieldMetadata,
     tasted_at: tastedAt,
+    tasted_on: tastedOn,
     created_at: createdAt,
     updated_at: createdAt,
   };
@@ -290,22 +312,66 @@ export async function createTastingRecord(
     const { data, error } = await rpc.rpc("save_cellar_tasting", {
       p_entry_id: record.cellarEntryId,
       p_quantity: record.cellarQuantity ?? 1,
-      p_event_date: tastedAt.slice(0, 10),
+      p_event_date: tastedOn,
       p_record: payload,
     });
     if (error) throw error;
-    const cloudRecord: CloudRecord = { ...payload, cellar_entry_id: record.cellarEntryId, cellar_movement_id: data?.movement_id };
+    const { data: persisted } = await db.from(COLLECTION).select("*").eq("id", id).eq("user_id", userId);
+    const cloudRecord: CloudRecord = (persisted?.[0] as unknown as CloudRecord) ?? { ...payload, updated_at: undefined, cellar_entry_id: record.cellarEntryId, cellar_movement_id: data?.movement_id };
     const photoUrls = await resolvePhotoUrls([cloudRecord]).catch(() => new Map<string, string>());
     return fromCloud(cloudRecord, photoIds.map((photoId) => photoUrls.get(photoId)).filter((url): url is string => Boolean(url)));
   }
-  let { error } = await db.from(COLLECTION).insert(payload);
+  let { data: inserted, error } = await db.from(COLLECTION).insert(payload).select("*");
 
   if (error && /grapes|field_metadata|column/i.test(String(error.message ?? error))) {
     const { grapes: _grapes, field_metadata: _fieldMetadata, ...legacyPayload } = payload;
-    ({ error } = await db.from(COLLECTION).insert(legacyPayload));
+    ({ data: inserted, error } = await db.from(COLLECTION).insert(legacyPayload).select("*"));
   }
 
   if (error) throw error;
-  const photoUrls = await resolvePhotoUrls([payload]);
-  return fromCloud(payload, photoIds.map((photoId) => photoUrls.get(photoId)).filter((url): url is string => Boolean(url)));
+  const persisted = (inserted?.[0] as unknown as CloudRecord) ?? payload;
+  const photoUrls = await resolvePhotoUrls([persisted]).catch(() => new Map<string, string>());
+  return fromCloud(persisted, photoIds.map((photoId) => photoUrls.get(photoId)).filter((url): url is string => Boolean(url)));
+}
+
+/** Updates never alter creation time or cellar movements. RLS enforces ownership. */
+export async function updateTastingRecord(record: TastingRecord): Promise<TastingRecord> {
+  const { ensureCloudbaseUser, getCloudbasePostgres } = await getCloudbase();
+  const userId = await ensureCloudbaseUser();
+  await requireLifecycleSchema();
+  const day = validateTastingDate(record.tastedOn ?? localDate());
+  const { data, error } = await getCloudbasePostgres().from(COLLECTION).update({
+    wine_name: record.wine, vintage: record.year || null, grape: record.grape, grapes: record.grapes,
+    country: record.country || null, region: record.region, note: record.note,
+    preference: record.preference || null, body_level: record.bodyLevel ?? null,
+    flavors: (record.flavors ?? []).map(value => value.trim()).filter(Boolean), field_metadata: record.fieldMetadata,
+    tasted_on: day, tasted_at: new Date(`${day}T12:00:00`).toISOString(), photo_ids: record.photoIds ?? [],
+  }).eq("id", record.id).eq("user_id", userId).is("deleted_at", null)
+    .eq("updated_at", record.updatedAt ?? record.createdAt ?? "").select("*");
+  if (error) throw error;
+  if (!data?.length) throw new Error("记录已被修改或删除，请刷新后再编辑");
+  const row = data[0] as unknown as CloudRecord;
+  const urls = await resolvePhotoUrls([row]).catch(() => new Map<string, string>());
+  return fromCloud(row, (row.photo_ids ?? []).map(id => urls.get(id)).filter((url): url is string => Boolean(url)));
+}
+
+export async function softDeleteTastingRecord(id: string): Promise<void> {
+  const { ensureCloudbaseUser, getCloudbasePostgres } = await getCloudbase();
+  const userId = await ensureCloudbaseUser();
+  await requireLifecycleSchema();
+  const { data, error } = await getCloudbasePostgres().from(COLLECTION)
+    .update({ deleted_at: new Date().toISOString() }).eq("user_id", userId).eq("id", id).is("deleted_at", null).select("id");
+  if (error) throw error;
+  if (!data?.length) throw new Error("记录不存在或已删除，请刷新后重试");
+}
+
+/** The database trigger enforces the 30-day recovery window. */
+export async function restoreTastingRecord(id: string): Promise<void> {
+  const { ensureCloudbaseUser, getCloudbasePostgres } = await getCloudbase();
+  const userId = await ensureCloudbaseUser();
+  const { data, error } = await getCloudbasePostgres().from(COLLECTION)
+    .update({ deleted_at: null }).eq("user_id", userId).eq("id", id)
+    .gt("deleted_at", new Date(Date.now() - 30 * 86400000).toISOString()).select("id");
+  if (error) throw error;
+  if (!data?.length) throw new Error("记录不存在或已超过30天恢复期限");
 }

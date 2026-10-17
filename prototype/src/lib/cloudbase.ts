@@ -23,6 +23,7 @@ export type WineAccount = {
   email: string | null;
   name: string;
   isAnonymous: boolean;
+  syncWarning?: string;
 };
 
 type VerifyEmailCode = (code: string) => Promise<WineAccount>;
@@ -44,12 +45,12 @@ function authError(error: unknown, fallback: string) {
   return new Error(fallback);
 }
 
-async function withAuthTimeout<T>(request: Promise<T>, message: string): Promise<T> {
+async function withAuthTimeout<T>(request: Promise<T>, message: string, timeoutMs = 15000): Promise<T> {
   let timer = 0;
   try {
     return await Promise.race([
       request,
-      new Promise<T>((_, reject) => { timer = window.setTimeout(() => reject(new Error(message)), 15000); }),
+      new Promise<T>((_, reject) => { timer = window.setTimeout(() => reject(new Error(message)), timeoutMs); }),
     ]);
   } finally {
     window.clearTimeout(timer);
@@ -72,10 +73,18 @@ async function syncProfile(account: WineAccount, nickname = account.name) {
   if (error) throw error;
 }
 
-function acceptAccount(user: any, nickname?: string) {
+async function acceptAccount(user: any, nickname?: string): Promise<WineAccount> {
   const account = accountFromUser(user);
   authPromise = Promise.resolve(account.id);
-  return syncProfile(account, nickname).then(() => ({ ...account, name: nickname || account.name }));
+  const accepted = { ...account, name: nickname || account.name };
+  try {
+    await withAuthTimeout(syncProfile(accepted), "个人资料同步超时", 3000);
+    return accepted;
+  } catch {
+    // The authentication session is already valid. A profile/database error
+    // must not turn a successful sign-in or email verification into a failure.
+    return { ...accepted, syncWarning: "已登录，个人资料暂未同步，请稍后重试" };
+  }
 }
 
 export async function getCurrentAccount(): Promise<WineAccount | null> {

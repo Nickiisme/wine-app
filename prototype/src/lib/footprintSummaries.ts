@@ -1,5 +1,6 @@
 import { getFeedbackEvidence, type TastingRecord } from "./tastingRecords";
 import { canonicalGrapeName, recordGrapeNames } from "./grapeCatalog";
+import { tastingTime } from "./tastingDates";
 import { resolveMapArea } from "./mapLayers";
 
 export type RecordFilter =
@@ -38,10 +39,7 @@ export function getRecordLocation(record: TastingRecord) {
   return { country, region };
 }
 
-function recordTime(record: TastingRecord) {
-  const timestamp = Date.parse(record.createdAt ?? "");
-  return Number.isFinite(timestamp) ? timestamp : 0;
-}
+function recordTime(record: TastingRecord) { return tastingTime(record); }
 
 function recentDate(record: TastingRecord) {
   const timestamp = recordTime(record);
@@ -55,7 +53,7 @@ function topValues(values: string[], limit: number) {
 }
 
 export function sortRecordsNewestFirst(records: TastingRecord[]) {
-  return [...records].sort((a, b) => recordTime(b) - recordTime(a));
+  return records.filter(record => !record.deletedAt).sort((a, b) => recordTime(b) - recordTime(a) || a.id.localeCompare(b.id));
 }
 
 export function filterTastingRecords(records: TastingRecord[], filter: RecordFilter) {

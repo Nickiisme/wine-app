@@ -13,6 +13,10 @@ import { CellarConsumeScreen, CellarDetailScreen, CellarListScreen, CellarPurcha
 import type { WineAccount } from "./lib/cloudbase";
 import "./locked-overrides.css";
 import "./onboarding.css";
+import { localDate, tastingDate, tastingTime, tastingLabel, validateTastingDate } from "./lib/tastingDates";
+import { TastingDatePicker } from "./TastingDatePicker";
+import { RecordEditor } from "./RecordEditor";
+import { softDeleteTastingRecord } from "./lib/tastingRecords";
 
 type Screen = "activity" | "onboarding" | "explore" | "allGrapes" | "confirm" | "taste" | "success" | "profile" | "records" | "grapeSummary" | "regionSummary" | "flavor" | "share" | "settings" | "auth" | "cellar" | "cellarConfirm" | "cellarPurchase" | "cellarDetail" | "cellarConsume";
 type ExploreTab = "grapes" | "regions";
@@ -179,6 +183,11 @@ export default function Prototype() {
   const [recordFilter, setRecordFilter] = useState<RecordFilter>(null);
   const [recordsOrigin, setRecordsOrigin] = useState<Screen>("profile");
   const [liked, setLiked] = useState<string | null>(null);
+  const [tastedOn, setTastedOn] = useState(localDate);
+  const [editingRecord, setEditingRecord] = useState<TastingRecord | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<TastingRecord | null>(null);
+  const deletingRecord = useRef(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedFlavors, setSelectedFlavors] = useState<string[]>([]);
   const [tastingNote, setTastingNote] = useState("");
   const [bodyLevel, setBodyLevel] = useState<number | null>(null);
@@ -191,6 +200,7 @@ export default function Prototype() {
   const [savingRecord, setSavingRecord] = useState(false);
   const [cloudMessage, setCloudMessage] = useState<string | null>(null);
   const [account, setAccount] = useState<WineAccount | null>(null);
+  const accountRefreshVersion = useRef(0);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [inputMethod, setInputMethod] = useState<InputMethod>("manual");
   const [labelScanState, setLabelScanState] = useState<LabelScanState>("idle");
@@ -219,7 +229,7 @@ export default function Prototype() {
   const tastingCellar = cellarEntries.find((entry) => entry.id === tastingCellarId) ?? null;
   const go = (next: Screen) => { keyboard.hide(); setScreen(next); };
   const openRecords = (filter: RecordFilter, origin: Screen) => { setRecordFilter(filter); setRecordsOrigin(origin); go("records"); };
-  const resetRecord = () => { setDraft((current) => { current.photos.forEach((photo) => URL.revokeObjectURL(photo.preview)); return newDraft(); }); setTastingNote(""); setLiked(null); setSelectedFlavors([]); setBodyLevel(null); setTastingCellarId(null); setLabelScanState("idle"); setLabelScanMessage(null); };
+  const resetRecord = () => { setTastedOn(localDate()); setDraft((current) => { current.photos.forEach((photo) => URL.revokeObjectURL(photo.preview)); return newDraft(); }); setTastingNote(""); setLiked(null); setSelectedFlavors([]); setBodyLevel(null); setTastingCellarId(null); setLabelScanState("idle"); setLabelScanMessage(null); };
   const startManualRecord = () => { setInputMethod("manual"); setRecordSheet(false); resetRecord(); go(recordPurpose === "cellar" ? "cellarConfirm" : "confirm"); };
   const openCamera = () => {
     setRecordPurpose("tasting");
@@ -306,24 +316,26 @@ export default function Prototype() {
 
   useEffect(() => {
     let active = true;
+    const version = accountRefreshVersion.current;
+    const isCurrent = () => active && version === accountRefreshVersion.current;
     listTastingRecords()
       .then((cloudRecords) => {
-        if (!active) return;
+        if (!isCurrent()) return;
         setRecords(cloudRecords);
         setRecordsLoaded(true);
         if (cloudRecords.length === 0 && window.localStorage.getItem(ONBOARDING_SEEN_KEY) !== "true") setScreen("onboarding");
         setCloudMessage(null);
       })
       .catch(() => {
-        if (active) { setRecordsLoaded(true); setCloudMessage("云端记录加载失败，请稍后重试"); }
+        if (isCurrent()) { setRecordsLoaded(true); setCloudMessage("云端记录加载失败，请稍后重试"); }
       });
     getAccountApi()
       .then((accountApi) => accountApi.getCurrentAccount())
-      .then((currentAccount) => { if (active) setAccount(currentAccount); })
-      .catch(() => { if (active) setAccount(null); });
+      .then((currentAccount) => { if (isCurrent()) setAccount(currentAccount); })
+      .catch(() => { if (isCurrent()) setAccount(null); });
     listCellarEntries()
-      .then((entries) => { if (active) { setCellarEntries(entries); setCellarLoaded(true); setCellarError(null); } })
-      .catch((error) => { if (active) { setCellarLoaded(true); setCellarError(error instanceof Error ? error.message : "藏酒加载失败"); } });
+      .then((entries) => { if (isCurrent()) { setCellarEntries(entries); setCellarLoaded(true); setCellarError(null); } })
+      .catch((error) => { if (isCurrent()) { setCellarLoaded(true); setCellarError(error instanceof Error ? error.message : "藏酒加载失败"); } });
     return () => { active = false; };
   }, []);
 
@@ -340,10 +352,25 @@ export default function Prototype() {
   };
 
   const refreshAccountData = async (nextAccount: WineAccount) => {
+    const version = ++accountRefreshVersion.current;
     setAccount(nextAccount);
-    setRecords(await listTastingRecords());
-    await refreshCellar().catch(() => {});
+    setEditingRecord(null);
+    setDeleteTarget(null);
+    setRecords([]);
+    setCellarEntries([]);
+    setCellarMovements([]);
+    setRecordsLoaded(false);
+    setCellarLoaded(false);
     setCloudMessage(null);
+    setCellarError(null);
+    const [tastings, cellar] = await Promise.allSettled([listTastingRecords(), listCellarEntries()]);
+    if (version !== accountRefreshVersion.current) return;
+    if (tastings.status === "fulfilled") setRecords(tastings.value);
+    else setCloudMessage("品鉴记录暂时加载失败，请稍后重试");
+    if (cellar.status === "fulfilled") setCellarEntries(cellar.value);
+    else setCellarError("藏酒暂时加载失败，请稍后重试");
+    setRecordsLoaded(true);
+    setCellarLoaded(true);
   };
 
   const openCellarDetail = (id: string) => {
@@ -401,6 +428,7 @@ export default function Prototype() {
     const quantity = Number(consumeQuantity);
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > selectedCellar.quantityRemaining) { setCellarActionError(`请选择 1–${selectedCellar.quantityRemaining} 瓶的实际饮用数量。`); return; }
     if (!consumeDate) { setCellarActionError("请选择饮用日期。"); return; }
+    try { validateTastingDate(consumeDate); } catch (error) { setCellarActionError((error as Error).message); return; }
     if (consumeMode === "tasting") {
       resetRecord();
       setDraft({ ...newDraft(), wine: selectedCellar.wineName, year: selectedCellar.vintage, grapes: selectedCellar.grapes, country: selectedCellar.country, region: selectedCellar.region, winery: selectedCellar.winery, fieldMetadata: {
@@ -411,6 +439,7 @@ export default function Prototype() {
         region: selectedCellar.region ? { source: "user_selected", confirmed: true } : undefined,
       } });
       setTastingCellarId(selectedCellar.id);
+      setTastedOn(consumeDate);
       setInputMethod("manual");
       go("taste");
       return;
@@ -453,7 +482,8 @@ export default function Prototype() {
   const recordCanBeSaved = canSaveRecord({ wine: draft.wine, grapes: draft.grapes, country: draft.country, region: draft.region, photoCount: draft.photos.length + (tastingCellar?.photoIds.length ?? 0), preference: liked, bodyLevel, flavors: selectedFlavors, note: tastingNote });
 
   const saveTasting = async () => {
-    if (!recordCanBeSaved) return;
+    if (!recordCanBeSaved || savingRecord) return;
+    try { validateTastingDate(tastedOn); } catch (error) { setCloudMessage((error as Error).message); return; }
     const previewRecord = pendingRecord();
     trackRecordEvent("record_save_clicked", getRecordAnalyticsProperties(previewRecord, inputMethod));
     setSavingRecord(true);
@@ -471,7 +501,7 @@ export default function Prototype() {
         existingPhotoIds: tastingCellar?.photoIds,
         cellarEntryId: tastingCellar?.id,
         cellarQuantity: tastingCellar ? Number(consumeQuantity) : undefined,
-        tastedAt: tastingCellar ? new Date(`${consumeDate}T12:00:00`) : undefined,
+        tastedOn,
         preference: liked ?? undefined,
         flavors: selectedFlavors,
         bodyLevel: bodyLevel ?? undefined,
@@ -503,13 +533,30 @@ export default function Prototype() {
     }
   };
 
+  const deleteTasting = async () => {
+    if (!deleteTarget || deletingRecord.current) return;
+    const target = deleteTarget;
+    const version = accountRefreshVersion.current;
+    deletingRecord.current = true;
+    setDeletingId(target.id);
+    setDeleteTarget(null);
+    setRecords(current => current.filter(record => record.id !== target.id));
+    try { await softDeleteTastingRecord(target.id); }
+    catch (error) {
+      if (version === accountRefreshVersion.current) {
+        setRecords(current => current.some(record => record.id === target.id) ? current : [...current, target]);
+        setCloudMessage(`删除失败，记录已恢复：${error instanceof Error ? error.message : "请稍后重试"}`);
+      }
+    } finally { deletingRecord.current = false; setDeletingId(null); }
+  };
+
   return (
     <div className="wine-app">
       {screen === "onboarding" && <OnboardingScreen onRecord={() => { rememberOnboarding(); go("explore"); openRecordChoices(); }} onExplore={() => { rememberOnboarding(); go("explore"); }} />}
       {screen === "explore" && <ExploreScreen tab={tab} records={records} recordsLoaded={recordsLoaded} account={account} dismissedPrompt={dismissedExplorePrompt} onDismissPrompt={setDismissedExplorePrompt} onTab={setTab} onRecord={openRecordChoices} onProfile={() => go("profile")} onAllGrapes={() => go("allGrapes")} onRegionNotes={(country, region) => openRecords({ kind: "region", country, region }, "explore")} onNotes={(grape) => openRecords({ kind: "grape", grape }, "explore")} />}
       {screen === "allGrapes" && <AllGrapesScreen records={records} onBack={() => go("explore")} onNotes={(grape) => openRecords({ kind: "grape", grape }, "allGrapes")} />}
       {screen === "confirm" && <ConfirmScreen draft={draft} scanState={labelScanState} scanMessage={labelScanMessage} onChange={setDraft} onBack={() => go("explore")} onNext={() => go("taste")} />}
-      {screen === "taste" && <TasteScreen liked={liked} setLiked={setLiked} selectedFlavors={selectedFlavors} toggleFlavor={(flavor) => setSelectedFlavors((current) => current.includes(flavor) ? current.filter((item) => item !== flavor) : [...current, flavor])} note={tastingNote} onNoteChange={setTastingNote} bodyLevel={bodyLevel} onBodyLevel={setBodyLevel} photos={draft.photos} existingPhotos={tastingCellar?.photos ?? []} cellarSummary={tastingCellar ? `${tastingCellar.wineName || "未命名藏酒"} · 本次 ${consumeQuantity} 瓶` : null} onCamera={() => noteCameraInput.current?.click()} onGallery={() => noteGalleryInput.current?.click()} onRemovePhoto={(id) => setDraft((current) => { const removed = current.photos.find((photo) => photo.id === id); if (removed) URL.revokeObjectURL(removed.preview); return { ...current, photos: current.photos.filter((photo) => photo.id !== id) }; })} onBack={() => go(tastingCellarId ? "cellarConsume" : "confirm")} onSave={saveTasting} canSave={recordCanBeSaved} saving={savingRecord} cloudMessage={cloudMessage} />}
+      {screen === "taste" && <TasteScreen tastedOn={tastedOn} onTastedOn={setTastedOn} liked={liked} setLiked={setLiked} selectedFlavors={selectedFlavors} toggleFlavor={(flavor) => setSelectedFlavors((current) => current.includes(flavor) ? current.filter((item) => item !== flavor) : [...current, flavor])} note={tastingNote} onNoteChange={setTastingNote} bodyLevel={bodyLevel} onBodyLevel={setBodyLevel} photos={draft.photos} existingPhotos={tastingCellar?.photos ?? []} cellarSummary={tastingCellar ? `${tastingCellar.wineName || "未命名藏酒"} · 本次 ${consumeQuantity} 瓶` : null} onCamera={() => noteCameraInput.current?.click()} onGallery={() => noteGalleryInput.current?.click()} onRemovePhoto={(id) => setDraft((current) => { const removed = current.photos.find((photo) => photo.id === id); if (removed) URL.revokeObjectURL(removed.preview); return { ...current, photos: current.photos.filter((photo) => photo.id !== id) }; })} onBack={() => go(tastingCellarId ? "cellarConsume" : "confirm")} onSave={saveTasting} canSave={recordCanBeSaved} saving={savingRecord} cloudMessage={cloudMessage} />}
       {screen === "success" && <SuccessScreen record={savedRecord} recordCount={records.length} firstTaste={Boolean(savedRecord && getFeedbackEvidence(savedRecord).mode === "tasting" && records.filter((record) => getFeedbackEvidence(record).mode === "tasting").length === 1)} specialDiscovery={newSpecialDiscovery} badgeAward={newBadgeAward} inputMethod={inputMethod} isGuest={!account || account.isAnonymous} onDone={() => go(tastingCellarId ? "cellarDetail" : "explore")} onSync={() => { setAuthMode("register"); go("auth"); }} />}
       {screen === "profile" && <ProfileScreen records={records} cellarEntries={cellarEntries} cellarLoaded={cellarLoaded} cellarError={cellarError} account={account} onExplore={() => go("explore")} onRecord={openCamera} onRecords={() => openRecords(null, "profile")} onGrapes={() => go("grapeSummary")} onRegions={() => go("regionSummary")} onCellar={() => { go("cellar"); void refreshCellar().catch(() => {}); }} onActivity={() => go("activity")} onFlavor={() => go("flavor")} onShare={() => go("share")} onSettings={() => go("settings")} />}
       {screen === "cellar" && <CellarListScreen entries={cellarEntries} loading={!cellarLoaded} error={cellarError} onBack={() => go("profile")} onAdd={openCellarChoices} onOpen={openCellarDetail} />}
@@ -519,12 +566,12 @@ export default function Prototype() {
       {screen === "cellarConsume" && selectedCellar && <CellarConsumeScreen entry={selectedCellar} mode={consumeMode} date={consumeDate} quantity={consumeQuantity} onDate={setConsumeDate} onQuantity={setConsumeQuantity} onBack={() => go("cellarDetail")} onSubmit={() => void submitConsumption()} saving={cellarBusy} error={cellarActionError} />}
       {screen === "grapeSummary" && <GrapeSummaryScreen records={records} onBack={() => go("profile")} onSelect={(grape) => openRecords({ kind: "grape", grape }, "grapeSummary")} />}
       {screen === "regionSummary" && <RegionSummaryScreen records={records} onBack={() => go("profile")} onSelect={(country, region) => openRecords({ kind: "region", country, region }, "regionSummary")} />}
-      {screen === "records" && <TastingRecordsScreen filter={recordFilter} records={records} cloudMessage={cloudMessage} onBack={() => go(recordsOrigin)} />}
+      {screen === "records" && <TastingRecordsScreen onEdit={record => { keyboard.hide(); setEditingRecord(record); }} onDelete={record => { keyboard.hide(); setDeleteTarget(record); }} deletingId={deletingId} filter={recordFilter} records={records} cloudMessage={cloudMessage} onBack={() => go(recordsOrigin)} />}
       {screen === "activity" && <DrinkingActivityScreen records={records} loaded={recordsLoaded} error={cloudMessage} onBack={() => go("profile")} />}
       {screen === "flavor" && <FlavorPreferenceScreen records={records} onBack={() => go("profile")} />}
       {screen === "share" && <ShareAtlasScreen records={records} account={account} onBack={() => go("profile")} />}
-      {screen === "settings" && <SettingsScreen account={account} onBack={() => go("profile")} onAuth={(mode) => { setAuthMode(mode); go("auth"); }} onSignedOut={async () => { const guest = await (await getAccountApi()).signOutToGuest(); await refreshAccountData(guest); }} />}
-      {screen === "auth" && <AuthScreen initialMode={authMode} onBack={() => go("settings")} onAuthenticated={async (nextAccount) => { await refreshAccountData(nextAccount); go("settings"); }} />}
+      {screen === "settings" && <SettingsScreen account={account} syncMessage={account?.syncWarning || cloudMessage || cellarError} syncing={!recordsLoaded || !cellarLoaded} onBack={() => go("profile")} onAuth={(mode) => { setAuthMode(mode); go("auth"); }} onSignedOut={async () => { const guest = await (await getAccountApi()).signOutToGuest(); await refreshAccountData(guest); }} />}
+      {screen === "auth" && <AuthScreen initialMode={authMode} onBack={() => go("settings")} onAuthenticated={async (nextAccount) => { void refreshAccountData(nextAccount); go("settings"); }} />}
       <BottomSheet open={recordSheet} onOpenChange={setRecordSheet} title="拍摄酒标" description={recordPurpose === "cellar" ? "拍摄或导入酒标，再确认酒款资料" : "对准正面酒标，自动识别酒款信息"} snap={0.64}>
         <div className="record-camera-flow">
           <button className="camera-preview" onClick={recordPurpose === "cellar" ? () => cameraInput.current?.click() : openCamera} aria-label="拍摄酒标"><span className="camera-frame"><CameraIcon /></span><strong>将酒标完整放入框内</strong><small>{recordPurpose === "cellar" ? "点击拍摄并确认酒款" : "点击拍摄并开始识别"}</small><span className="camera-shutter"><CameraIcon /></span></button>
@@ -536,6 +583,13 @@ export default function Prototype() {
       <input ref={galleryInput} hidden type="file" accept="image/*" onChange={useSelectedPhoto} aria-label="从相册选择酒标照片" />
       <input ref={noteCameraInput} hidden type="file" accept="image/*" capture="environment" onChange={addNotePhotos} aria-label="继续拍摄品鉴照片" />
       <input ref={noteGalleryInput} hidden type="file" accept="image/*" multiple onChange={addNotePhotos} aria-label="继续上传品鉴照片" />
+      {editingRecord && <RecordEditor key={editingRecord.id} record={editingRecord} onClose={() => setEditingRecord(null)} onSaved={saved => { setRecords(current => current.map(record => record.id === saved.id ? saved : record)); setEditingRecord(null); }} />}
+      <BottomSheet open={!!deleteTarget} onOpenChange={open => { if (!open) setDeleteTarget(null); }} title="删除这条品鉴记录？" snap={0.45}>
+        <p>删除后，这条品鉴记录、照片和相关徽章进度可能会同步变化，确定删除吗？</p>
+        <p>记录保留30天恢复窗口。藏酒库存不会自动恢复。</p>
+        <button className="primary-action" onClick={() => void deleteTasting()}>删除记录</button>
+        <button className="text-action" onClick={() => setDeleteTarget(null)}>取消</button>
+      </BottomSheet>
     </div>
   );
 }
@@ -854,7 +908,7 @@ function OptionPicker({ open, onOpenChange, title, options, value, searchable, o
   return <BottomSheet open={open} onOpenChange={(nextOpen) => { if (!nextOpen) keyboard.hide(); onOpenChange(nextOpen); }} title={title} description={searchable ? "支持中文或英文搜索，常用品项优先" : "选择酒标上的年份"} snap={0.68}><div className="option-picker" style={{ "--picker-keyboard-height": `${keyboard.height}px` } as CSSProperties} tabIndex={0} aria-label={`${title}选项`}>{searchable && <div className="picker-search"><PickerSearchInput value={query} onChange={setQuery} placeholder={`搜索${title.replace("选择", "")}`} /></div>}<div className="picker-options">{visibleOptions.map((option) => <button className={option.value === value ? "selected" : ""} onClick={() => { keyboard.hide(); onSelect(option.value); }} key={option.value}><span>{option.label}</span>{option.value === value && <CheckIcon />}</button>)}{visibleOptions.length === 0 && <p className="picker-empty">没有找到相关选项</p>}</div></div></BottomSheet>;
 }
 
-function TasteScreen({ liked, setLiked, selectedFlavors, toggleFlavor, note, onNoteChange, bodyLevel, onBodyLevel, photos, existingPhotos, cellarSummary, onCamera, onGallery, onRemovePhoto, onBack, onSave, canSave, saving, cloudMessage }: { liked: string | null; setLiked: (liked: string | null) => void; selectedFlavors: string[]; toggleFlavor: (flavor: string) => void; note: string; onNoteChange: (note: string) => void; bodyLevel: number | null; onBodyLevel: (value: number | null) => void; photos: DraftPhoto[]; existingPhotos: string[]; cellarSummary: string | null; onCamera: () => void; onGallery: () => void; onRemovePhoto: (id: string) => void; onBack: () => void; onSave: () => Promise<void>; canSave: boolean; saving: boolean; cloudMessage: string | null }) {
+function TasteScreen({ tastedOn, onTastedOn, liked, setLiked, selectedFlavors, toggleFlavor, note, onNoteChange, bodyLevel, onBodyLevel, photos, existingPhotos, cellarSummary, onCamera, onGallery, onRemovePhoto, onBack, onSave, canSave, saving, cloudMessage }: { tastedOn: string; onTastedOn: (value: string) => void; liked: string | null; setLiked: (liked: string | null) => void; selectedFlavors: string[]; toggleFlavor: (flavor: string) => void; note: string; onNoteChange: (note: string) => void; bodyLevel: number | null; onBodyLevel: (value: number | null) => void; photos: DraftPhoto[]; existingPhotos: string[]; cellarSummary: string | null; onCamera: () => void; onGallery: () => void; onRemovePhoto: (id: string) => void; onBack: () => void; onSave: () => Promise<void>; canSave: boolean; saving: boolean; cloudMessage: string | null }) {
   const { bottomInset } = useKeyboardInsets();
   const [saveInset, setSaveInset] = useState(0);
   useEffect(() => {
@@ -884,6 +938,7 @@ function TasteScreen({ liked, setLiked, selectedFlavors, toggleFlavor, note, onN
   }, [bottomInset]);
   const selectedBody = bodyChoices.find((choice) => choice.value === bodyLevel);
   return <><div className="record-header-dock"><FlowHeader title="你的感受" onBack={onBack} /></div><MobileScroll className="app-scroll paper-screen"><main className="flow-content record-flow-content taste-content">
+    <TastingDatePicker value={tastedOn} onChange={onTastedOn} />
     {cellarSummary && <div className="cellar-taste-summary">来自我的藏酒 · {cellarSummary}</div>}
     <section className="question-block"><div className="question-title"><h2>你喜欢这杯酒吗？</h2><span>{liked ?? "未评价"}</span></div>
       <div className="choice-row taste-choice-row">{["不喜欢", "还不错", "喜欢"].map((option) => <button aria-pressed={liked === option} className={liked === option ? "selected" : ""} onClick={() => setLiked(liked === option ? null : option)} key={option}>{option}</button>)}</div>
@@ -962,13 +1017,14 @@ function SuccessScreen({ record, recordCount, firstTaste, specialDiscovery, badg
   </>;
 }
 
-function getProfileBadges(records: TastingRecord[], cellarCount = 0): BadgeDefinition[] {
-  const chronological = [...records].sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? ""));
+function getProfileBadges(records: TastingRecord[], cellarCount = 0, cellarEarnedAt?: string): BadgeDefinition[] {
+  records = records.filter(record => !record.deletedAt);
+  const chronological = records.filter(record => !record.deletedAt).sort((a, b) => tastingTime(a) - tastingTime(b) || a.id.localeCompare(b.id));
   const confirmedGrapes = new Set<string>();
   const confirmedCountries = new Set<string>();
   const confirmedRegions = new Set<string>();
   const confirmedFlavors = new Set<string>();
-  const qualification = (test: (record: TastingRecord) => boolean) => chronological.find((record) => test(record))?.createdAt;
+  const qualification = (test: (record: TastingRecord) => boolean) => { const matched = chronological.find(test); return matched ? tastingDate(matched) || undefined : undefined; };
   for (const record of chronological) {
     if (record.fieldMetadata?.grapes?.confirmed && record.fieldMetadata.grapes.source !== "default") recordGrapeNames(record).forEach((grape) => confirmedGrapes.add(grape));
     if (record.fieldMetadata?.country?.confirmed && record.fieldMetadata.country.source !== "default" && record.country) confirmedCountries.add(record.country);
@@ -988,19 +1044,19 @@ function getProfileBadges(records: TastingRecord[], cellarCount = 0): BadgeDefin
   const heritageAt = special((record) => recordGrapeNames(record).some((name) => SPECIAL_GRAPES.some((grape) => grape.chinese_name === name)));
   const oldWorld = new Set(["法国", "意大利", "西班牙", "德国", "葡萄牙", "奥地利", "希腊", "匈牙利", "格鲁吉亚"]);
   const newWorld = new Set(["美国", "智利", "阿根廷", "澳大利亚", "新西兰", "南非", "中国", "加拿大", "乌拉圭"]);
-  const oldNewAt = qualification((record) => { const grapes = recordGrapeNames(record); return grapes.some((grape) => chronological.some((other) => other !== record && recordGrapeNames(other).includes(grape) && oldWorld.has(record.country ?? "") && newWorld.has(other.country ?? ""))) || grapes.some((grape) => chronological.some((other) => other !== record && recordGrapeNames(other).includes(grape) && newWorld.has(record.country ?? "") && oldWorld.has(other.country ?? ""))); });
-  const terroirAt = qualification((record) => recordGrapeNames(record).some((grape) => new Set(chronological.filter((other) => recordGrapeNames(other).includes(grape) && other.region).map((other) => other.region)).size >= 3));
-  const chinaAt = qualification((record) => new Set(chronological.filter((item) => item.createdAt && record.createdAt && (item.createdAt <= record.createdAt) && item.country === "中国" && item.region).map((item) => item.region)).size >= 3);
+  const oldNewAt = qualification((record) => { const grapes = recordGrapeNames(record); return grapes.some((grape) => chronological.some((other) => other !== record && tastingTime(other) <= tastingTime(record) && recordGrapeNames(other).includes(grape) && oldWorld.has(record.country ?? "") && newWorld.has(other.country ?? ""))) || grapes.some((grape) => chronological.some((other) => other !== record && tastingTime(other) <= tastingTime(record) && recordGrapeNames(other).includes(grape) && newWorld.has(record.country ?? "") && oldWorld.has(other.country ?? ""))); });
+  const terroirAt = qualification((record) => recordGrapeNames(record).some((grape) => new Set(chronological.filter((other) => tastingTime(other) <= tastingTime(record) && recordGrapeNames(other).includes(grape) && other.region).map((other) => other.region)).size >= 3));
+  const chinaAt = qualification((record) => new Set(chronological.filter((item) => tastingDate(item) && tastingDate(record) && (tastingDate(item) <= tastingDate(record)) && item.country === "中国" && item.region).map((item) => item.region)).size >= 3);
   const definitions: BadgeDefinition[] = [
-    { name: "初次举杯", description: "保存第一杯", image: "first-glass.png", progress: Math.min(records.length, 1), target: 1, earnedAt: chronological[0]?.createdAt },
+    { name: "初次举杯", description: "保存第一杯", image: "first-glass.png", progress: Math.min(records.length, 1), target: 1, earnedAt: chronological[0] ? tastingDate(chronological[0]) : undefined },
     { name: "品鉴初识", description: "写下首次真实感受", image: "first-review.png", progress: firstTaste ? 1 : 0, target: 1, earnedAt: firstTaste },
     { name: "品种探索", description: "记录 3 种已确认葡萄", image: "three-grapes.png", progress: progress(3, confirmedGrapes), target: 3, earnedAt: countAt(3, (record) => recordGrapeNames(record)) },
     { name: "产地旅人", description: "记录 3 个已确认国家", image: "three-countries.png", progress: progress(3, confirmedCountries), target: 3, earnedAt: countAt(3, (record) => record.fieldMetadata?.country?.confirmed && record.country ? [record.country] : []) },
-    { name: "记录达人", description: "完成 10 条品鉴记录", image: "first-tasting-v2.png", progress: Math.min(records.length, 10), target: 10, earnedAt: chronological[9]?.createdAt },
+    { name: "记录达人", description: "完成 10 条品鉴记录", image: "first-tasting-v2.png", progress: Math.min(records.length, 10), target: 10, earnedAt: chronological[9] ? tastingDate(chronological[9]) : undefined },
     { name: "品种收藏家", description: "探索 12 种核心葡萄", image: "variety-explorer.png", progress: progress(12, confirmedGrapes), target: 12, earnedAt: countAt(12, (record) => recordGrapeNames(record)) },
     { name: "产区漫游者", description: "探索 8 个葡萄酒产区", image: "region-explorer.png", progress: progress(8, confirmedRegions), target: 8, earnedAt: countAt(8, (record) => record.fieldMetadata?.region?.confirmed && record.region ? [record.region] : []) },
     { name: "风味入门", description: "记录 3 类真实风味", image: "flavor-notes.png", progress: progress(3, confirmedFlavors), target: 3, earnedAt: countAt(3, (record) => record.fieldMetadata?.flavors?.confirmed && record.flavors ? record.flavors : []) },
-    { name: "我的酒窖", description: "收藏第一瓶藏酒", image: "cellar-keeper.png", progress: Math.min(cellarCount, 1), target: 1, earnedAt: cellarCount ? new Date().toISOString() : undefined },
+    { name: "我的酒窖", description: "收藏第一瓶藏酒", image: "cellar-keeper.png", progress: Math.min(cellarCount, 1), target: 1, earnedAt: cellarCount ? cellarEarnedAt : undefined },
     { name: "混酿初体验", description: "首次记录混酿葡萄酒", image: "discovery-blend.png", progress: blendAt ? 1 : 0, target: 1, earnedAt: blendAt },
     { name: "气泡时刻", description: "首次记录起泡酒", image: "discovery-sparkling.png", progress: sparklingAt ? 1 : 0, target: 1, earnedAt: sparklingAt },
     { name: "甜蜜发现", description: "首次记录甜酒", image: "discovery-sweet.png", progress: sweetAt ? 1 : 0, target: 1, earnedAt: sweetAt },
@@ -1029,10 +1085,10 @@ function ProfileScreen({ records, cellarEntries, cellarLoaded, cellarError, acco
   const stats = getRecordStats(records);
   const storedBottles = cellarEntries.reduce((sum, entry) => sum + entry.quantityRemaining, 0);
   const consumedBottles = cellarEntries.reduce((sum, entry) => sum + entry.quantityPurchased - entry.quantityRemaining, 0);
-  const badges = getProfileBadges(records, cellarEntries.reduce((sum, entry) => sum + entry.quantityPurchased, 0));
+  const badges = getProfileBadges(records, cellarEntries.reduce((sum, entry) => sum + entry.quantityPurchased, 0), cellarEntries.map(entry => entry.createdAt).filter(Boolean).sort()[0]);
   const cellarSubtitle = cellarError ? "藏酒暂不可用 · 点击查看" : cellarLoaded ? `${storedBottles} 瓶在藏 · ${consumedBottles} 瓶已饮用` : "正在读取藏酒…";
   const displayName = account && !account.isAnonymous ? account.name : "葡萄酒探索者";
-  return <><MobileScroll className="app-scroll paper-screen"><main className="profile-content"><p className="eyebrow">我的</p><div className="profile-head"><span>{displayName.slice(0, 1).toUpperCase()}</span><div><h1>{displayName}</h1><p>{stats.grapeCount} 个品种 · {stats.regionCount} 个产区 · {stats.recordCount} 次品鉴</p></div></div><section className="badge-section"><div className="section-title"><h2>我的徽章</h2><span className="badge-count">已获得 {badges.filter((badge) => badge.state === "earned").length}/{badges.length}</span></div><Carousel className="badge-carousel" contentClassName="badge-row" ariaLabel="我的徽章，可左右滑动">{badges.map((badge, index) => <div className={`badge-item ${badge.state}`} key={badge.name} aria-label={`${badge.name}，${badge.state === "earned" ? "已获得" : badge.description}`}><img className="badge-medal" src={asset(`assets/badges/${badge.image}`)} alt="" draggable={false} loading={index < 3 ? "eager" : "lazy"} fetchPriority={index === 0 ? "high" : "auto"} decoding="async" /><strong>{badge.name}</strong><small>{badge.state === "earned" ? new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "numeric", day: "numeric" }).format(new Date(badge.earnedAt!)) : badge.state === "in-progress" ? `${badge.description} · ${badge.progress}/${badge.target}` : badge.description}</small></div>)}</Carousel></section><section className="footprint-section"><div className="section-title"><h2>我的足迹</h2></div><div className="footprint-row"><button onClick={onRecords} aria-label={`查看${stats.recordCount}条品鉴记录`}><strong>{stats.recordCount}</strong><span>品鉴记录</span></button><button onClick={onGrapes} aria-label={`查看喝过的${stats.grapeCount}个葡萄品种`}><strong>{stats.grapeCount}</strong><span>葡萄品种</span></button><button onClick={onRegions} aria-label={`查看探索过的${stats.regionCount}个产区`}><strong>{stats.regionCount}</strong><span>探索产区</span></button></div></section><div className="profile-menu"><button onClick={onActivity}>饮酒足迹<span className="profile-menu-trailing"><small>饮酒频率与记录</small><span aria-hidden="true">›</span></span></button><button onClick={onCellar}>我的藏酒<span className="profile-menu-trailing"><small>{cellarSubtitle}</small><span aria-hidden="true">›</span></span></button><button onClick={onFlavor}>我的风味偏好<span>›</span></button><button onClick={onShare}>分享我的图鉴<span>›</span></button><button onClick={onSettings}>设置<span>›</span></button></div></main></MobileScroll><BottomNav active="profile" onExplore={onExplore} onRecord={onRecord} onProfile={() => {}} /></>;
+  return <><MobileScroll className="app-scroll paper-screen"><main className="profile-content"><p className="eyebrow">我的</p><div className="profile-head"><span>{displayName.slice(0, 1).toUpperCase()}</span><div><h1>{displayName}</h1><p>{stats.grapeCount} 个品种 · {stats.regionCount} 个产区 · {stats.recordCount} 次品鉴</p></div></div><section className="badge-section"><div className="section-title"><h2>我的徽章</h2><span className="badge-count">已获得 {badges.filter((badge) => badge.state === "earned").length}/{badges.length}</span></div><Carousel className="badge-carousel" contentClassName="badge-row" ariaLabel="我的徽章，可左右滑动">{badges.map((badge, index) => <div className={`badge-item ${badge.state}`} key={badge.name} aria-label={`${badge.name}，${badge.state === "earned" ? "已获得" : badge.description}`}><img className="badge-medal" src={asset(`assets/badges/${badge.image}`)} alt="" draggable={false} loading={index < 3 ? "eager" : "lazy"} fetchPriority={index === 0 ? "high" : "auto"} decoding="async" /><strong>{badge.name}</strong><small>{badge.state === "earned" ? new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "numeric", day: "numeric" }).format(new Date(badge.earnedAt!.length === 10 ? `${badge.earnedAt}T12:00:00` : badge.earnedAt!)) : badge.state === "in-progress" ? `${badge.description} · ${badge.progress}/${badge.target}` : badge.description}</small></div>)}</Carousel></section><section className="footprint-section"><div className="section-title"><h2>我的足迹</h2></div><div className="footprint-row"><button onClick={onRecords} aria-label={`查看${stats.recordCount}条品鉴记录`}><strong>{stats.recordCount}</strong><span>品鉴记录</span></button><button onClick={onGrapes} aria-label={`查看喝过的${stats.grapeCount}个葡萄品种`}><strong>{stats.grapeCount}</strong><span>葡萄品种</span></button><button onClick={onRegions} aria-label={`查看探索过的${stats.regionCount}个产区`}><strong>{stats.regionCount}</strong><span>探索产区</span></button></div></section><div className="profile-menu"><button onClick={onActivity}>饮酒足迹<span className="profile-menu-trailing"><small>饮酒频率与记录</small><span aria-hidden="true">›</span></span></button><button onClick={onCellar}>我的藏酒<span className="profile-menu-trailing"><small>{cellarSubtitle}</small><span aria-hidden="true">›</span></span></button><button onClick={onFlavor}>我的风味偏好<span>›</span></button><button onClick={onShare}>分享我的图鉴<span>›</span></button><button onClick={onSettings}>设置<span>›</span></button></div></main></MobileScroll><BottomNav active="profile" onExplore={onExplore} onRecord={onRecord} onProfile={() => {}} /></>;
 }
 
 function GrapeSummaryScreen({ records, onBack, onSelect }: { records: TastingRecord[]; onBack: () => void; onSelect: (grape: string) => void }) {
@@ -1050,7 +1106,7 @@ function RegionSummaryScreen({ records, onBack, onSelect }: { records: TastingRe
   return <MobileScroll className="app-scroll paper-screen"><main className="flow-content footprint-summary-content"><FlowHeader title="我探索过的产区" onBack={onBack} /><p className="footprint-summary-intro">按国家看看，你的葡萄酒足迹到了哪里。</p>{countries.length ? <div className="country-summary-list">{countries.map((group) => <section className="country-summary-group" key={group.country}><header><GlobeIcon /><h2>{group.country}</h2><span>{group.count} 次品鉴</span></header><div>{group.regions.map((region) => <button className="region-summary-row" key={region.name} onClick={() => onSelect(group.country, region.name)} aria-label={`查看${group.country}${region.name || "未填写产区"}的${region.count}条品鉴记录`}><span className="region-summary-main"><strong>{region.name || "未填写产区"}</strong><small>{region.count} 次品鉴 · 喜欢 {region.likedCount} 次</small><small>主要葡萄：{region.grapes.join("、") || "未填写"}</small><small>最近品鉴：{region.recentDate}</small></span><span className="summary-chevron" aria-hidden="true">›</span></button>)}</div></section>)}</div> : <p className="footprint-empty">还没有记录国家或产区。下一杯可以留意酒标上的产地。</p>}</main></MobileScroll>;
 }
 
-function SettingsScreen({ account, onBack, onAuth, onSignedOut }: { account: WineAccount | null; onBack: () => void; onAuth: (mode: "login" | "register") => void; onSignedOut: () => Promise<void> }) {
+function SettingsScreen({ account, syncMessage, syncing, onBack, onAuth, onSignedOut }: { account: WineAccount | null; syncMessage: string | null | undefined; syncing: boolean; onBack: () => void; onAuth: (mode: "login" | "register") => void; onSignedOut: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const registered = Boolean(account && !account.isAnonymous);
@@ -1059,7 +1115,7 @@ function SettingsScreen({ account, onBack, onAuth, onSignedOut }: { account: Win
     setError(null);
     try { await onSignedOut(); } catch (reason) { setError(reason instanceof Error ? reason.message : "退出失败，请稍后重试"); } finally { setBusy(false); }
   };
-  return <MobileScroll className="app-scroll paper-screen"><main className="flow-content settings-content"><FlowHeader title="设置" onBack={onBack} />{registered ? <><section className="account-card registered"><span className="account-avatar">{account?.name.slice(0, 1).toUpperCase()}</span><div><small>已登录</small><h2>{account?.name}</h2><p>{account?.email}</p></div></section><button className="account-primary" onClick={() => void signOut()} disabled={busy}>{busy ? "正在退出…" : "退出登录"}</button>{error && <p className="auth-message error" role="alert">{error}</p>}<section className="settings-group"><h3>账号与数据</h3><div><span>云端同步</span><strong>已开启</strong></div><div><span>数据归属</span><strong>CloudBase 加密存储</strong></div></section><section className="settings-group"><h3>关于</h3><div><span>隐私说明</span><strong>›</strong></div><div><span>版本</span><strong>初心版 0.1</strong></div></section></> : <section className="guest-auth-choice"><span aria-hidden="true">🍷</span><h2>登录你的葡萄酒图鉴</h2><p>继续保存品鉴记录、徽章与风味偏好</p><div className="guest-auth-actions"><button className="account-primary" onClick={() => onAuth("login")}>登录</button><button className="account-secondary" onClick={() => onAuth("register")}>注册</button></div></section>}</main></MobileScroll>;
+  return <MobileScroll className="app-scroll paper-screen"><main className="flow-content settings-content"><FlowHeader title="设置" onBack={onBack} />{registered ? <><section className="account-card registered"><span className="account-avatar">{account?.name.slice(0, 1).toUpperCase()}</span><div><small>已登录</small><h2>{account?.name}</h2><p>{account?.email}</p></div></section>{syncMessage && <p className="auth-message" role="status">{syncMessage}</p>}<button className="account-primary" onClick={() => void signOut()} disabled={busy}>{busy ? "正在退出…" : "退出登录"}</button>{error && <p className="auth-message error" role="alert">{error}</p>}<section className="settings-group"><h3>账号与数据</h3><div><span>云端同步</span><strong>{syncing ? "正在同步…" : syncMessage ? "部分数据待同步" : "已开启"}</strong></div><div><span>数据归属</span><strong>CloudBase 加密存储</strong></div></section><section className="settings-group"><h3>关于</h3><div><span>隐私说明</span><strong>›</strong></div><div><span>版本</span><strong>初心版 0.1</strong></div></section></> : <section className="guest-auth-choice"><span aria-hidden="true">🍷</span><h2>登录你的葡萄酒图鉴</h2><p>继续保存品鉴记录、徽章与风味偏好</p><div className="guest-auth-actions"><button className="account-primary" onClick={() => onAuth("login")}>登录</button><button className="account-secondary" onClick={() => onAuth("register")}>注册</button></div></section>}</main></MobileScroll>;
 }
 
 function AuthScreen({ initialMode, onBack, onAuthenticated }: { initialMode: "login" | "register"; onBack: () => void; onAuthenticated: (account: WineAccount) => Promise<void> }) {
@@ -1118,12 +1174,12 @@ function AuthScreen({ initialMode, onBack, onAuthenticated }: { initialMode: "lo
   return <MobileScroll className="app-scroll paper-screen"><main className="flow-content auth-content"><FlowHeader title="账号" onBack={onBack} /><div className="auth-heading"><span>🍷</span><h1>{step === "verify" ? "查收你的邮箱" : "保存每一次举杯"}</h1><p>{step === "verify" ? "输入邮件中的验证码，完成身份验证" : "登录后，你的品鉴记录、徽章和风味偏好会安全同步"}</p></div>{step === "form" ? <><div className="auth-tabs" role="tablist"><button className={mode === "login" ? "active" : ""} onClick={() => switchMode("login")}>登录</button><button className={mode === "register" ? "active" : ""} onClick={() => switchMode("register")}>注册</button></div>{mode === "login" && <div className="login-method"><button className={loginMethod === "password" ? "active" : ""} onClick={() => { setLoginMethod("password"); resetFeedback(); }}>密码登录</button><button className={loginMethod === "otp" ? "active" : ""} onClick={() => { setLoginMethod("otp"); resetFeedback(); }}>验证码登录</button></div>}<div className="auth-fields">{mode === "register" && <label><span>昵称</span><KeyboardInput value={nickname} minLength={2} maxLength={48} onChange={(event) => setNickname(event.currentTarget.value)} placeholder="2–48 个字符" autoComplete="nickname" /></label>}<label><span>邮箱</span><KeyboardInput type="email" value={email} onChange={(event) => setEmail(event.currentTarget.value)} placeholder="name@example.com" autoComplete="email" /></label>{(mode === "register" || loginMethod === "password") && <label><span>密码</span><KeyboardInput type="password" value={password} maxLength={32} onChange={(event) => setPassword(event.currentTarget.value)} placeholder="至少 8 位，包含字母和数字" autoComplete={mode === "register" ? "new-password" : "current-password"} /></label>}</div>{mode === "login" && loginMethod === "password" && <button className="forgot-link" onClick={() => void resetPassword()}>忘记密码？</button>}<button className="account-primary" onClick={() => void submit()} disabled={busy}>{busy ? "请稍候…" : mode === "register" ? "发送验证码并注册" : loginMethod === "otp" ? "发送登录验证码" : "登录"}</button></> : <><div className="verify-code"><KeyboardInput inputMode="numeric" value={code} maxLength={8} onChange={(event) => setCode(event.currentTarget.value.replace(/\D/g, ""))} placeholder="输入验证码" aria-label="邮箱验证码" /></div><button className="account-primary" onClick={() => void verify()} disabled={busy}>{busy ? "正在验证…" : mode === "register" ? "完成注册" : "完成登录"}</button><button className="auth-back-link" onClick={() => { setStep("form"); setCode(""); resetFeedback(); }}>返回修改邮箱</button></>}{message && <p className="auth-message success" role="status">{message}</p>}{error && <p className="auth-message error" role="alert">{error}</p>}<p className="auth-terms">继续即表示你同意用户协议与隐私政策。账号认证由 CloudBase 安全处理。</p></main></MobileScroll>;
 }
 
-function TastingRecordsScreen({ filter, records: allRecords, cloudMessage, onBack }: { filter: RecordFilter; records: TastingRecord[]; cloudMessage: string | null; onBack: () => void }) {
+function TastingRecordsScreen({ onEdit, onDelete, deletingId, filter, records: allRecords, cloudMessage, onBack }: { onEdit: (record: TastingRecord) => void; onDelete: (record: TastingRecord) => void; deletingId: string | null; filter: RecordFilter; records: TastingRecord[]; cloudMessage: string | null; onBack: () => void }) {
   const [viewer, setViewer] = useState<{ photos: string[]; index: number; wine: string } | null>(null);
   const records = filterTastingRecords(allRecords, filter);
   const title = filter?.kind === "grape" ? `${filter.grape}的品鉴记录` : filter?.kind === "region" ? `${filter.region || filter.country}的品鉴记录` : "我的品鉴记录";
   const moveViewer = (direction: number) => setViewer((current) => current ? { ...current, index: (current.index + direction + current.photos.length) % current.photos.length } : null);
-  return <><MobileScroll className="app-scroll paper-screen"><main className="flow-content records-content"><FlowHeader title={title} onBack={onBack} />{cloudMessage && <p className="records-summary" role="status">{cloudMessage}</p>}<div className="timeline-year"><strong>时间线</strong><span>共 {records.length} 次品鉴</span></div>{records.length ? <div className="records-timeline">{records.map((record, index) => { const date = splitRecordDate(record.date); const photos = record.photos ?? []; const confirmedFlavors = getFeedbackEvidence(record).confirmedFlavors; return <article className="timeline-record" key={record.id}><time className="timeline-date" dateTime={record.createdAt}><strong>{date.day}</strong><span>{date.month}</span></time><div className="timeline-dot" aria-hidden="true" /><div className="timeline-content"><div className="timeline-meta"><span>{record.grape}</span><small>{record.region}</small></div>{photos.length > 0 && <div className={`timeline-photo-grid count-${Math.min(photos.length, 3)}`}>{photos.slice(0, 9).map((photo, photoIndex) => <div key={photo}><button className="timeline-photo-button" onClick={() => setViewer({ photos, index: photoIndex, wine: record.wine })} aria-label={`查看${record.wine}第${photoIndex + 1}张照片`}><img className="timeline-photo" src={photo} alt={`${record.wine}品鉴照片 ${photoIndex + 1}`} draggable={false} loading={index < 2 ? "eager" : "lazy"} decoding="async" />{photoIndex === 8 && photos.length > 9 && <span>+{photos.length - 9}</span>}</button></div>)}</div>}<h2>{record.wine}{record.year ? ` · ${record.year}` : ""}</h2><p>{record.note || "这一杯还没有写下品鉴感受。"}</p>{confirmedFlavors.length > 0 && <div className="timeline-flavors">{confirmedFlavors.slice(0, 4).map((flavor) => <span key={flavor}>{flavor}</span>)}</div>}</div></article>; })}</div> : <p className="footprint-empty">这里还没有品鉴记录。</p>}</main></MobileScroll>{viewer && <div className="photo-viewer" role="dialog" aria-modal="true" aria-label={`${viewer.wine}照片详情`} onClick={() => setViewer(null)}><header><button onClick={() => setViewer(null)} aria-label="关闭照片详情">×</button><span>{viewer.index + 1} / {viewer.photos.length}</span></header><div className="photo-viewer-stage" onClick={(event) => event.stopPropagation()}>{viewer.photos.length > 1 && <button className="photo-viewer-prev" onClick={() => moveViewer(-1)} aria-label="上一张照片">‹</button>}<img src={viewer.photos[viewer.index]} alt={`${viewer.wine}照片详情`} />{viewer.photos.length > 1 && <button className="photo-viewer-next" onClick={() => moveViewer(1)} aria-label="下一张照片">›</button>}</div><footer>{viewer.wine}</footer></div>}</>;
+  return <><MobileScroll className="app-scroll paper-screen"><main className="flow-content records-content"><FlowHeader title={title} onBack={onBack} />{cloudMessage && <p className="records-summary" role="status">{cloudMessage}</p>}<div className="timeline-year"><strong>时间线</strong><span>共 {records.length} 次品鉴</span></div>{records.length ? <div className="records-timeline">{records.map((record, index) => { const date = splitRecordDate(record.date); const photos = record.photos ?? []; const confirmedFlavors = getFeedbackEvidence(record).confirmedFlavors; return <article className="timeline-record" key={record.id}><time className="timeline-date" dateTime={tastingDate(record)}><strong>{date.day}</strong><span>{date.month}</span></time><div className="timeline-dot" aria-hidden="true" /><div className="timeline-content"><p>{tastingLabel(record)}</p><div className="record-actions"><button disabled={!!deletingId} onClick={() => onEdit(record)}>编辑记录</button><button disabled={!!deletingId} onClick={() => onDelete(record)}>删除记录</button></div><div className="timeline-meta"><span>{record.grape}</span><small>{record.region}</small></div>{photos.length > 0 && <div className={`timeline-photo-grid count-${Math.min(photos.length, 3)}`}>{photos.slice(0, 9).map((photo, photoIndex) => <div key={photo}><button className="timeline-photo-button" onClick={() => setViewer({ photos, index: photoIndex, wine: record.wine })} aria-label={`查看${record.wine}第${photoIndex + 1}张照片`}><img className="timeline-photo" src={photo} alt={`${record.wine}品鉴照片 ${photoIndex + 1}`} draggable={false} loading={index < 2 ? "eager" : "lazy"} decoding="async" />{photoIndex === 8 && photos.length > 9 && <span>+{photos.length - 9}</span>}</button></div>)}</div>}<h2>{record.wine}{record.year ? ` · ${record.year}` : ""}</h2><p>{record.note || "这一杯还没有写下品鉴感受。"}</p>{confirmedFlavors.length > 0 && <div className="timeline-flavors">{confirmedFlavors.slice(0, 4).map((flavor) => <span key={flavor}>{flavor}</span>)}</div>}</div></article>; })}</div> : <p className="footprint-empty">这里还没有品鉴记录。</p>}</main></MobileScroll>{viewer && <div className="photo-viewer" role="dialog" aria-modal="true" aria-label={`${viewer.wine}照片详情`} onClick={() => setViewer(null)}><header><button onClick={() => setViewer(null)} aria-label="关闭照片详情">×</button><span>{viewer.index + 1} / {viewer.photos.length}</span></header><div className="photo-viewer-stage" onClick={(event) => event.stopPropagation()}>{viewer.photos.length > 1 && <button className="photo-viewer-prev" onClick={() => moveViewer(-1)} aria-label="上一张照片">‹</button>}<img src={viewer.photos[viewer.index]} alt={`${viewer.wine}照片详情`} />{viewer.photos.length > 1 && <button className="photo-viewer-next" onClick={() => moveViewer(1)} aria-label="下一张照片">›</button>}</div><footer>{viewer.wine}</footer></div>}</>;
 }
 
 function ShareAtlasScreen({ records, account, onBack }: { records: TastingRecord[]; account: WineAccount | null; onBack: () => void }) {
@@ -1174,10 +1230,10 @@ function DrinkingActivityScreen({ records, loaded, error, onBack }: { records: T
   const dayKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const dated = records.flatMap(record => {
-    const timestamp = record.tastedAtIso || record.createdAt;
+    const timestamp = tastingDate(record);
     if (!timestamp) return [];
-    const date = new Date(timestamp);
-    return Number.isNaN(date.getTime()) || date > new Date() ? [] : [{ record, date, key: dayKey(date) }];
+    const date = new Date(`${timestamp}T00:00:00`);
+    return record.deletedAt || Number.isNaN(date.getTime()) || timestamp > localDate() ? [] : [{ record, date, key: dayKey(date) }];
   });
   const unavailable = !loaded || Boolean(error?.includes("加载失败") && !records.length);
   const days = new Set(dated.map(item => item.key));
