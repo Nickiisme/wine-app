@@ -18,7 +18,7 @@ import { TastingDatePicker } from "./TastingDatePicker";
 import { RecordEditor } from "./RecordEditor";
 import { softDeleteTastingRecord } from "./lib/tastingRecords";
 
-type Screen = "activity" | "onboarding" | "explore" | "allGrapes" | "confirm" | "taste" | "success" | "profile" | "records" | "grapeSummary" | "regionSummary" | "flavor" | "share" | "settings" | "auth" | "cellar" | "cellarConfirm" | "cellarPurchase" | "cellarDetail" | "cellarConsume";
+type Screen = "activity" | "onboarding" | "explore" | "allGrapes" | "confirm" | "taste" | "success" | "profile" | "records" | "grapeSummary" | "regionSummary" | "flavor" | "share" | "settings" | "privacy" | "auth" | "cellar" | "cellarConfirm" | "cellarPurchase" | "cellarDetail" | "cellarConsume";
 type ExploreTab = "grapes" | "regions";
 type DraftPhoto = { id: string; preview: string; file: File; preparedFile: Promise<File> };
 type WineDraft = { wine: string; year: string; grapes: string[]; country: string; region: string; winery: string; photos: DraftPhoto[]; fieldMetadata: RecordFieldMetadata };
@@ -570,7 +570,8 @@ export default function Prototype() {
       {screen === "activity" && <DrinkingActivityScreen records={records} loaded={recordsLoaded} error={cloudMessage} onBack={() => go("profile")} />}
       {screen === "flavor" && <FlavorPreferenceScreen records={records} onBack={() => go("profile")} />}
       {screen === "share" && <ShareAtlasScreen records={records} account={account} onBack={() => go("profile")} />}
-      {screen === "settings" && <SettingsScreen account={account} syncMessage={account?.syncWarning || cloudMessage || cellarError} syncing={!recordsLoaded || !cellarLoaded} onBack={() => go("profile")} onAuth={(mode) => { setAuthMode(mode); go("auth"); }} onSignedOut={async () => { const guest = await (await getAccountApi()).signOutToGuest(); await refreshAccountData(guest); }} />}
+      {screen === "settings" && <SettingsScreen account={account} syncMessage={account?.syncWarning || cloudMessage || cellarError} syncing={!recordsLoaded || !cellarLoaded} onBack={() => go("profile")} onPrivacy={() => go("privacy")} onAuth={(mode) => { setAuthMode(mode); go("auth"); }} onSignedOut={async () => { const guest = await (await getAccountApi()).signOutToGuest(); await refreshAccountData(guest); }} />}
+      {screen === "privacy" && <PrivacyPolicyScreen onBack={() => go("settings")} />}
       {screen === "auth" && <AuthScreen initialMode={authMode} onBack={() => go("settings")} onAuthenticated={async (nextAccount) => { void refreshAccountData(nextAccount); go("settings"); }} />}
       <BottomSheet open={recordSheet} onOpenChange={setRecordSheet} title="拍摄酒标" description={recordPurpose === "cellar" ? "拍摄或导入酒标，再确认酒款资料" : "对准正面酒标，自动识别酒款信息"} snap={0.64}>
         <div className="record-camera-flow">
