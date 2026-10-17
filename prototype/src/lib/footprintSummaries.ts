@@ -1,5 +1,6 @@
 import { getFeedbackEvidence, type TastingRecord } from "./tastingRecords";
 import { canonicalGrapeName, recordGrapeNames } from "./grapeCatalog";
+import { resolveMapArea } from "./mapLayers";
 
 export type RecordFilter =
   | { kind: "grape"; grape: string }
@@ -32,7 +33,7 @@ export function getRecordGrapes(record: TastingRecord) {
 
 export function getRecordLocation(record: TastingRecord) {
   const parts = record.region.split("·").map((part) => part.trim()).filter(Boolean);
-  const country = record.country?.trim() || (parts.length > 1 ? parts[0] : parts.length ? "国家未填写" : "");
+  const country = record.country?.trim() || (parts.length > 1 ? parts[0] : "国家未确定");
   const region = parts.length > 1 ? parts.slice(1).join(" · ") : parts[0] === country ? "" : parts[0] || "";
   return { country, region };
 }
@@ -63,7 +64,10 @@ export function filterTastingRecords(records: TastingRecord[], filter: RecordFil
   if (filter.kind === "grape") return sorted.filter((record) => getRecordGrapes(record).includes(canonicalGrapeName(filter.grape) ?? filter.grape));
   return sorted.filter((record) => {
     const location = getRecordLocation(record);
-    return location.country === filter.country && location.region === filter.region;
+    if (location.country !== filter.country) return false;
+    const recordArea = resolveMapArea(location.country, location.region);
+    const filterArea = resolveMapArea(filter.country, filter.region);
+    return recordArea.id === filterArea.id;
   });
 }
 

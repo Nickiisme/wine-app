@@ -1,4 +1,6 @@
 import type { TastingRecord } from "./tastingRecords";
+import { getCountryArea, getCountryRegions, resolveCatalogArea, type WineMapArea } from "./wineMapCatalog";
+export { WINE_MAP_AREAS, type WineMapArea } from "./wineMapCatalog";
 
 export const MAP_ZOOM = { countries: 1.6, moreCountries: 2.2, regions: 2.6, records: 4, max: 6 };
 // Coordinates are anchors on the existing illustrated world map, not vineyard GPS positions.
@@ -16,32 +18,35 @@ export const EXTRA_COUNTRIES = [
   { country: "格鲁吉亚", x: 63, y: 202, zoom: 2.2 }, { country: "日本", x: 85, y: 208, zoom: 2.2 },
   { country: "乌拉圭", x: 34, y: 285, zoom: 2.2 },
 ];
-export const COUNTRY_REGIONS: Record<string, string[]> = {
-  法国: ["香槟", "卢瓦尔河谷", "勃艮第", "波尔多", "罗讷河谷"], 意大利: ["皮埃蒙特", "威尼托", "托斯卡纳", "西西里"],
-  中国: ["宁夏贺兰山东麓", "新疆", "山东蓬莱", "云南香格里拉"], 美国: ["纳帕谷", "索诺玛", "威拉米特谷"],
-  澳大利亚: ["巴罗萨谷", "雅拉谷", "玛格丽特河"], 新西兰: ["马尔堡", "中奥塔哥", "霍克斯湾"],
-  西班牙: ["里奥哈", "杜埃罗河岸", "普里奥拉托", "下海湾"], 德国: ["摩泽尔", "莱茵高", "法尔兹"],
-  葡萄牙: ["杜罗河谷", "绿酒产区", "阿连特茹"], 智利: ["迈坡谷", "空加瓜谷", "卡萨布兰卡谷"],
-  阿根廷: ["门多萨", "优克谷", "萨尔塔"], 南非: ["斯泰伦博斯", "斯沃特兰", "帕尔"],
-  奥地利: ["瓦豪", "坎普谷", "克雷姆斯谷"], 匈牙利: ["托卡伊", "埃格尔", "维拉尼"],
-  希腊: ["圣托里尼", "尼米亚", "纳乌萨"], 加拿大: ["奥肯那根谷", "尼亚加拉半岛"],
-  格鲁吉亚: ["卡赫季", "卡尔特利", "伊梅列季"], 日本: ["山梨", "长野", "北海道"], 乌拉圭: ["卡内洛内斯", "马尔多纳多"],
-};
+export const OTHER_REGION_ID = (countryCode: string) => `region-${countryCode.toLowerCase()}-other`;
+export function getCountryAreas(country: string) { return getCountryRegions(country); }
+export function resolveMapArea(country: string, value: string): WineMapArea {
+  const normalized = value.trim();
+  const parent = getCountryArea(country);
+  const area = resolveCatalogArea(country, normalized);
+  return area ?? { id: OTHER_REGION_ID(parent?.countryCode ?? "unknown"), nameZh: "其他产区", aliases: [normalized], type: "region", parentId: parent?.id, countryCode: parent?.countryCode ?? "", minimumZoom: MAP_ZOOM.regions, priority: 0, status: "unresolved", source: `unmatched record value: ${normalized}` };
+}
 
 export function mapRecordLocation(record: TastingRecord) {
   const parts = record.region.split("·").map((part) => part.trim()).filter(Boolean);
-  return { country: record.country?.trim() || (parts.length > 1 ? parts[0] : ""), region: parts.length > 1 ? parts.slice(1).join(" · ") : parts[0] === record.country ? "" : parts[0] || "" };
+  const country = record.country?.trim() || (parts.length > 1 ? parts[0] : "国家未确定");
+  return { country, region: parts.length > 1 ? parts.slice(1).join(" · ") : parts[0] === record.country ? "" : parts[0] || "" };
 }
 
 export function aggregateMapRecords(records: TastingRecord[]) {
-  const countries = new Map<string, { count: number; regions: Map<string, TastingRecord[]>; records: TastingRecord[] }>();
+  const countries = new Map<string, { count: number; regions: Map<string, TastingRecord[]>; unresolved: Map<string, TastingRecord[]>; records: TastingRecord[] }>();
   for (const record of records) {
     const { country, region } = mapRecordLocation(record);
-    if (!country || country === "不确定") continue;
-    const group = countries.get(country) ?? { count: 0, regions: new Map<string, TastingRecord[]>(), records: [] as TastingRecord[] };
+    const displayCountry = country === "不确定" ? "国家未确定" : country;
+    const group = countries.get(displayCountry) ?? { count: 0, regions: new Map<string, TastingRecord[]>(), unresolved: new Map<string, TastingRecord[]>(), records: [] as TastingRecord[] };
     group.count++; group.records.push(record);
-    if (region && region !== "不确定") group.regions.set(region, [...group.regions.get(region) ?? [], record]);
-    countries.set(country, group);
+    if (region && region !== "不确定") {
+      const resolved = resolveMapArea(displayCountry, region);
+      const display = resolved.status === "unresolved" ? "其他产区" : resolved.nameZh;
+      group.regions.set(display, [...group.regions.get(display) ?? [], record]);
+      if (resolved.status === "unresolved") group.unresolved.set(region, [...group.unresolved.get(region) ?? [], record]);
+    }
+    countries.set(displayCountry, group);
   }
   return countries;
 }

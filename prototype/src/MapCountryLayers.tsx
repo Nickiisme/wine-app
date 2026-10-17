@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { ArrowLeftIcon } from "@radix-ui/react-icons";
 import { MobileScroll } from "./mobile";
-import { aggregateMapRecords, COUNTRY_REGIONS, mapRecordLocation, MAP_ZOOM } from "./lib/mapLayers";
+import { aggregateMapRecords, getCountryAreas, mapRecordLocation, MAP_ZOOM } from "./lib/mapLayers";
 import type { TastingRecord } from "./lib/tastingRecords";
 
 type Props = {
@@ -18,6 +18,19 @@ const COUNTRY_MAP_ART: Record<string, string> = {
   美国: "usa-wine-map.webp",
   澳大利亚: "australia-wine-map.webp",
   新西兰: "new-zealand-wine-map.webp",
+  西班牙: "spain-wine-map.svg",
+  德国: "germany-wine-map.svg",
+  葡萄牙: "portugal-wine-map.svg",
+  智利: "chile-wine-map.svg",
+  阿根廷: "argentina-wine-map.svg",
+  南非: "south-africa-wine-map.svg",
+  奥地利: "austria-wine-map.svg",
+  匈牙利: "hungary-wine-map.svg",
+  希腊: "greece-wine-map.svg",
+  加拿大: "canada-wine-map.svg",
+  格鲁吉亚: "georgia-wine-map.svg",
+  日本: "japan-wine-map.svg",
+  乌拉圭: "uruguay-wine-map.svg",
 };
 
 export function MapCountryLayers({ country, records, selectedRegion, facts, onBack, onRegion, onRecords }: Props) {
@@ -27,7 +40,7 @@ export function MapCountryLayers({ country, records, selectedRegion, facts, onBa
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef<{ distance: number; zoom: number } | null>(null);
   const group = useMemo(() => aggregateMapRecords(records).get(country), [records, country]);
-  const regions = useMemo(() => [...new Set([...(COUNTRY_REGIONS[country] ?? []), ...group?.regions.keys() ?? []])]
+  const regions = useMemo(() => [...new Set([...getCountryAreas(country).map((area) => area.nameZh), ...group?.regions.keys() ?? []])]
     .map((name, index) => ({ name, index, count: group?.regions.get(name)?.length ?? 0 })), [country, group]);
   const updateZoom = (value: number) => {
     if (value < MAP_ZOOM.regions - .15) { onRegion(null); onBack(); return; }
@@ -55,13 +68,14 @@ export function MapCountryLayers({ country, records, selectedRegion, facts, onBa
   const pointerEnd = (event: PointerEvent<HTMLDivElement>) => { pointers.current.delete(event.pointerId); pinch.current = null; };
   const details = zoom >= MAP_ZOOM.records;
   const entries = selectedRegion ? group?.regions.get(selectedRegion) ?? [] : group?.records ?? [];
+  const unresolvedValues = [...(group?.unresolved.keys() ?? [])];
   const mapArt = COUNTRY_MAP_ART[country];
   return <section className="region-map region-map-zoomed map-country-layers" aria-label={`${country}葡萄酒产区地图`}>
     <header className="region-zoom-header"><button onClick={() => { if (selectedRegion) onRegion(null); else onBack(); }} aria-label={selectedRegion ? "返回产区地图" : "返回世界地图"}><ArrowLeftIcon /></button><div><strong>{selectedRegion || `${country} · 产区地图`}</strong><small>{details ? "酒款记录" : "主要产区与我的足迹"}</small></div></header>
     <div className="map-country-body" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} onDoubleClick={(event) => { if (!(event.target as HTMLElement).closest("button")) updateZoom(details ? MAP_ZOOM.regions : MAP_ZOOM.records); }} onWheel={(event) => { if (event.ctrlKey) { event.preventDefault(); updateZoom(zoomRef.current - event.deltaY * .01); } }}>
       <MobileScroll className="map-country-scroll"><div className="map-country-content">
         {!selectedRegion && facts && <div className="map-country-facts"><span>葡萄园面积 {facts.area}</span><span>年产量 {facts.output}</span><p>主要品种：{facts.grapes}</p></div>}
-        {!details && !selectedRegion && <div className={`map-region-visual ${mapArt ? "has-country-art" : ""}`} aria-label={`${country}主要葡萄酒产区`}>{mapArt && <img src={`${import.meta.env.BASE_URL}assets/maps/${mapArt}`} alt={`${country}葡萄酒产区插画地图`} draggable={false} />}{regions.map(({ name }, index) => <button key={name} style={{ left: `${[27, 61, 67, 26, 67, 48][index % 6]}%`, top: `${[35, 20, 43, 66, 70, 52][index % 6]}%` }} onClick={() => onRegion(name)}><strong>{name}</strong></button>)}</div>}
+        {!details && !selectedRegion && <><div className={`map-region-visual ${mapArt ? "has-country-art" : ""}`} aria-label={`${country}国家地图轮廓`}>{mapArt && <img src={`${import.meta.env.BASE_URL}assets/maps/${mapArt}`} alt={`${country}地图`} draggable={false} />}</div><div className="map-region-labels" aria-label={`${country}葡萄酒产区列表`}>{regions.map(({ name, count }, index) => <button key={name} className={count ? "is-lit" : ""} onClick={() => onRegion(name)}><span>{count}</span><strong>{name}</strong><small>{name === "其他产区" ? "位置待核实" : `产区 ${index + 1}`}</small></button>)}</div>{unresolvedValues.length > 0 && <p className="map-layer-empty" role="status">待核实产区：{unresolvedValues.join("、")}</p>}</>}
         {!details && selectedRegion && <div className="map-region-overview"><h3>{selectedRegion}</h3><p>{entries.length} 次品鉴</p>{facts && <p>常见品种：{facts.grapes}</p>}<button className="notes-link" onClick={() => onRecords(country, selectedRegion)}>查看 {entries.length} 条品酒笔记 ›</button><button className="text-action" onClick={() => updateZoom(MAP_ZOOM.records)}>放大查看酒款记录</button></div>}
         {details && <div className="map-wine-records">{entries.length ? entries.map((record) => <button key={record.id} onClick={() => onRecords(country, selectedRegion || mapRecordLocation(record).region)}>{record.photos?.[0] && <img src={record.photos[0]} alt="" draggable={false} loading="lazy" />}<span><strong>{record.wine}</strong><small>{record.date} · {record.year || "年份未填写"}</small></span><span aria-hidden="true">›</span></button>) : <p className="map-layer-empty">这里还没有酒款记录。</p>}</div>}
         {!details && !selectedRegion && regions.length === 0 && <p className="map-layer-empty">产区资料正在完善；记录过的产区会自动出现在这里。</p>}
