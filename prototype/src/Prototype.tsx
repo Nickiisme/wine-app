@@ -956,7 +956,7 @@ function TasteScreen({ tastedOn, onTastedOn, liked, setLiked, selectedFlavors, t
       <button className="upload-note-photo" onClick={onGallery}><ImageIcon /> 从相册上传{photos.length > 0 ? "更多照片" : "照片"}</button><small className="photo-help">最多 9 张；酒标识别照片会自动排在第一张。</small>
     </section>
   </main></MobileScroll><div className="taste-save-bar" style={{ bottom: saveInset }}>
-    {!canSave && <p className="save-requirement" role="status">至少添加一张照片、酒款信息或品鉴感受。</p>}{cloudMessage && <p className="helper-copy" role="status">{cloudMessage}</p>}
+    {!canSave && <p className="save-requirement" role="status">至少添加一张照片、酒款信息或品鉴感受。</p>}
     <button className="primary-action" onClick={() => void onSave()} disabled={saving || !canSave}>{saving ? "正在上传并保存…" : "保存记录"}</button>
   </div></>;
 }
