@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type WheelEvent as ReactWheelEvent } from "react";
-import { ArrowLeftIcon, BookmarkFilledIcon, CameraIcon, CheckCircledIcon, CheckIcon, ChevronDownIcon, DrawingPinFilledIcon, GlobeIcon, ImageIcon, LayersIcon, Pencil2Icon, PersonIcon, PlusIcon } from "@radix-ui/react-icons";
+import { ArchiveIcon, ArrowLeftIcon, BookmarkFilledIcon, CalendarIcon, CameraIcon, CheckCircledIcon, CheckIcon, ChevronDownIcon, DownloadIcon, DrawingPinFilledIcon, GearIcon, GlobeIcon, ImageIcon, LayersIcon, Pencil2Icon, PersonIcon, PlusIcon, Share2Icon } from "@radix-ui/react-icons";
 import { BottomSheet, Carousel, KeyboardInput, KeyboardTextarea, MobileScroll, useKeyboard, useKeyboardInsets } from "./mobile";
 import { buildKnowledgeFeedback, buildSaveFeedback, canSaveRecord, createTastingRecord, getFeedbackEvidence, listTastingRecords, updateTastingRecord, uploadRecordPhotos, type RecordFieldMetadata, type SaveFeedback, type TastingRecord } from "./lib/tastingRecords";
 import { filterTastingRecords, summarizeGrapes, summarizeRegions, type RecordFilter } from "./lib/footprintSummaries";
@@ -630,11 +630,8 @@ export default function Prototype() {
       {screen === "auth" && <AuthScreen initialMode={authMode} onBack={() => go("settings")} onAuthenticated={async (nextAccount) => { void refreshAccountData(nextAccount); go("settings"); }} />}
       {savedRecord && <SuccessScreen record={savedRecord} recordCount={records.length} firstTaste={Boolean(getFeedbackEvidence(savedRecord).mode === "tasting" && records.filter((record) => getFeedbackEvidence(record).mode === "tasting").length === 1)} specialDiscovery={newSpecialDiscovery} badgeAward={newBadgeAward} inputMethod={inputMethod} isGuest={!account || account.isAnonymous} onDone={(knowledge) => { setSavedRecord(null); setNewSpecialDiscovery(null); setNewBadgeAward(null); setKnowledgeToast(knowledge); }} onSync={() => { setSavedRecord(null); setNewSpecialDiscovery(null); setNewBadgeAward(null); setAuthMode("register"); go("auth"); }} />}
       {knowledgeToast && <aside className="knowledge-toast" role="status" aria-live="polite"><span aria-hidden="true">✦</span><div><strong>{knowledgeToast.title}</strong><p>{knowledgeToast.description}</p></div></aside>}
-      <BottomSheet open={recordSheet} onOpenChange={setRecordSheet} title="拍摄酒标" description={recordPurpose === "cellar" ? "拍摄或导入酒标，再确认酒款资料" : "对准正面酒标，自动识别酒款信息"} snap={0.64}>
-        <div className="record-camera-flow">
-          {recordSheet && <LabelCamera key={cameraEpoch} onCapture={file => { setInputMethod("camera"); void processLabelPhoto(file); }} onSystemCamera={() => { setInputMethod("camera"); cameraInput.current?.click(); }} />}
-          <div className="record-alternatives"><p>也可以</p><RecordOption icon={<ImageIcon />} title="从相册导入" detail="选择已有的酒标照片" onClick={openGallery} /><RecordOption icon={<Pencil2Icon />} title="手动记录" detail="没有照片也可以继续" onClick={startManualRecord} /></div>
-        </div>
+      <BottomSheet open={recordSheet} onOpenChange={setRecordSheet} title="拍摄酒标" snap={1}>
+          {recordSheet && <LabelCamera key={cameraEpoch} onCapture={file => { setInputMethod("camera"); void processLabelPhoto(file); }} onSystemCamera={() => { setInputMethod("camera"); cameraInput.current?.click(); }} onClose={() => setRecordSheet(false)} onGallery={openGallery} onManual={startManualRecord} />}
       </BottomSheet>
       <BottomSheet open={cellarOpenSheet} onOpenChange={setCellarOpenSheet} title="开一瓶" description="想为这次举杯留下什么？" snap={0.42}><div className="record-alternatives"><RecordOption icon={<CheckCircledIcon />} title="只标记已饮用" detail="记录日期和数量，更新库存" onClick={() => beginConsumption("mark")} /><RecordOption icon={<Pencil2Icon />} title="记录这次品鉴" detail="写下感受，并同步更新足迹" onClick={() => beginConsumption("tasting")} /></div></BottomSheet>
       <input ref={cameraInput} hidden type="file" accept="image/*" capture="environment" onChange={useSelectedPhoto} aria-label="调用后置摄像头拍摄酒标" />
@@ -1093,9 +1090,20 @@ function ProfileScreen({ records, cellarEntries, cellarLoaded, cellarError, acco
   const storedBottles = cellarEntries.reduce((sum, entry) => sum + entry.quantityRemaining, 0);
   const consumedBottles = cellarEntries.reduce((sum, entry) => sum + entry.quantityPurchased - entry.quantityRemaining, 0);
   const badges = getProfileBadges(records, cellarEntries.reduce((sum, entry) => sum + entry.quantityPurchased, 0), cellarEntries.map(entry => entry.createdAt).filter(Boolean).sort()[0]);
+  const earnedBadgeCount = badges.filter((badge) => badge.state === "earned").length;
   const cellarSubtitle = cellarError ? "藏酒暂不可用 · 点击查看" : cellarLoaded ? `${storedBottles} 瓶在藏 · ${consumedBottles} 瓶已饮用` : "正在读取藏酒…";
   const displayName = account && !account.isAnonymous ? account.name : "葡萄酒探索者";
-  return <><MobileScroll className="app-scroll paper-screen"><main className="profile-content"><p className="eyebrow">我的</p><div className="profile-head"><span>{displayName.slice(0, 1).toUpperCase()}</span><div><h1>{displayName}</h1><p>{stats.grapeCount} 个品种 · {stats.regionCount} 个产区 · {stats.recordCount} 次品鉴</p></div></div><section className="badge-section"><div className="section-title"><h2>我的徽章</h2><span className="badge-count">已获得 {badges.filter((badge) => badge.state === "earned").length}/{badges.length}</span></div><Carousel className="badge-carousel" contentClassName="badge-row" ariaLabel="我的徽章，可左右滑动">{badges.map((badge, index) => <div className={`badge-item ${badge.state}`} key={badge.name} aria-label={`${badge.name}，${badge.state === "earned" ? "已获得" : badge.description}`}><img className="badge-medal" src={asset(`assets/badges/${badge.image}`)} alt="" draggable={false} loading={index < 3 ? "eager" : "lazy"} fetchPriority={index === 0 ? "high" : "auto"} decoding="async" /><strong>{badge.name}</strong><small>{badge.state === "earned" ? new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "numeric", day: "numeric" }).format(new Date(badge.earnedAt!.length === 10 ? `${badge.earnedAt}T12:00:00` : badge.earnedAt!)) : badge.state === "in-progress" ? `${badge.description} · ${badge.progress}/${badge.target}` : badge.description}</small></div>)}</Carousel></section><section className="footprint-section"><div className="section-title"><h2>我的足迹</h2></div><div className="footprint-row"><button onClick={onRecords} aria-label={`查看${stats.recordCount}条品鉴记录`}><strong>{stats.recordCount}</strong><span>品鉴记录</span></button><button onClick={onGrapes} aria-label={`查看喝过的${stats.grapeCount}个葡萄品种`}><strong>{stats.grapeCount}</strong><span>葡萄品种</span></button><button onClick={onRegions} aria-label={`查看探索过的${stats.regionCount}个产区`}><strong>{stats.regionCount}</strong><span>探索产区</span></button></div></section><div className="profile-menu"><button onClick={onActivity}>饮酒足迹<span className="profile-menu-trailing"><small>饮酒频率与记录</small><span aria-hidden="true">›</span></span></button><button onClick={onCellar}>我的藏酒<span className="profile-menu-trailing"><small>{cellarSubtitle}</small><span aria-hidden="true">›</span></span></button><button onClick={onFlavor}>我的风味偏好<span>›</span></button><button onClick={onShare}>分享我的图鉴<span>›</span></button><button onClick={onSettings}>设置<span>›</span></button></div></main></MobileScroll><BottomNav active="profile" onExplore={onExplore} onRecord={onRecord} onProfile={() => {}} /></>;
+  return <><MobileScroll className="app-scroll paper-screen"><main className="profile-content profile-dashboard">
+    <header className="profile-topbar"><p className="eyebrow">我的</p><button className="profile-settings" onClick={onSettings} aria-label="打开设置"><GearIcon /></button></header>
+    <section className="profile-identity" aria-label="个人资料"><span className="profile-avatar">{displayName.slice(0, 1).toUpperCase()}</span><div><h1>{displayName}</h1><p>记录每一杯，发现自己的口味</p></div></section>
+    <section className="profile-stats" aria-label="品鉴概览"><button onClick={onRecords} aria-label={`查看${stats.recordCount}条品鉴记录`}><strong>{stats.recordCount}</strong><span>品鉴记录</span></button><button onClick={onGrapes} aria-label={`查看喝过的${stats.grapeCount}个葡萄品种`}><strong>{stats.grapeCount}</strong><span>葡萄品种</span></button><button onClick={onRegions} aria-label={`查看探索过的${stats.regionCount}个产区`}><strong>{stats.regionCount}</strong><span>探索产区</span></button></section>
+    <section className="profile-life"><h2>我的酒生活</h2><div className="profile-life-list">
+      <button onClick={onCellar}><span className="profile-life-icon" aria-hidden="true"><ArchiveIcon /></span><span className="profile-life-copy"><strong>我的藏酒</strong><small>{cellarSubtitle}</small></span><span className="profile-chevron" aria-hidden="true">›</span></button>
+      <button onClick={onActivity}><span className="profile-life-icon" aria-hidden="true"><CalendarIcon /></span><span className="profile-life-copy"><strong>品鉴日历</strong><small>按日期查看品鉴足迹</small></span><span className="profile-chevron" aria-hidden="true">›</span></button>
+    </div></section>
+    <section className="badge-section profile-badges"><div className="section-title"><h2>我的徽章</h2><span className="badge-count">{earnedBadgeCount}/{badges.length} <span aria-hidden="true">›</span></span></div><Carousel className="badge-carousel" contentClassName="badge-row" ariaLabel="我的徽章，可左右滑动">{badges.map((badge, index) => <div className={`badge-item ${badge.state}`} key={badge.name} aria-label={`${badge.name}，${badge.state === "earned" ? "已获得" : badge.description}`}><img className="badge-medal" src={asset(`assets/badges/${badge.image}`)} alt="" draggable={false} loading={index < 3 ? "eager" : "lazy"} fetchPriority={index === 0 ? "high" : "auto"} decoding="async" /><strong>{badge.name}</strong><small>{badge.state === "earned" ? new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "numeric", day: "numeric" }).format(new Date(badge.earnedAt!.length === 10 ? `${badge.earnedAt}T12:00:00` : badge.earnedAt!)) : badge.state === "in-progress" ? `${badge.description} · ${badge.progress}/${badge.target}` : badge.description}</small></div>)}</Carousel></section>
+    <nav className="profile-secondary" aria-label="更多个人功能"><button onClick={onFlavor}>我的风味偏好<span aria-hidden="true">›</span></button><button onClick={onShare}>分享我的图鉴<span aria-hidden="true">›</span></button></nav>
+  </main></MobileScroll><BottomNav active="profile" onExplore={onExplore} onRecord={onRecord} onProfile={() => {}} /></>;
 }
 
 function GrapeSummaryScreen({ records, onBack, onSelect }: { records: TastingRecord[]; onBack: () => void; onSelect: (grape: string) => void }) {
@@ -1194,22 +1202,131 @@ function TastingRecordsScreen({ onEdit, onDelete, deletingId, filter, records: a
   return <><MobileScroll className="app-scroll paper-screen"><main className="flow-content records-content"><FlowHeader title={title} onBack={onBack} />{cloudMessage && <p className="records-summary" role="status">{cloudMessage}</p>}<div className="timeline-year"><strong>时间线</strong><span>共 {records.length} 次品鉴</span></div>{records.length ? <div className="records-timeline">{records.map((record, index) => { const date = splitRecordDate(record.date); const photos = record.photos ?? []; const confirmedFlavors = getFeedbackEvidence(record).confirmedFlavors; return <RecordSwipe key={record.id} name={record.wine} disabled={!!deletingId} open={openActions === record.id} onOpen={open => setOpenActions(open ? record.id : null)} onEdit={() => { setOpenActions(null); onEdit(record); }} onDelete={() => { setOpenActions(null); onDelete(record); }}><article className="timeline-record"><time className="timeline-date" dateTime={tastingDate(record)}><strong>{date.day}</strong><span>{date.month}</span></time><div className="timeline-dot" aria-hidden="true" /><div className="timeline-content"><p>{tastingLabel(record)}</p><div className="timeline-meta"><span>{record.grape}</span><small>{record.region}</small></div>{photos.length > 0 && <div className={`timeline-photo-grid count-${Math.min(photos.length, 3)}`}>{photos.slice(0, 9).map((photo, photoIndex) => <div key={photo}><button className="timeline-photo-button" onClick={() => setViewer({ photos, index: photoIndex, wine: record.wine })} aria-label={`查看${record.wine}第${photoIndex + 1}张照片`}><img className="timeline-photo" src={photo} alt={`${record.wine}品鉴照片 ${photoIndex + 1}`} draggable={false} loading={index < 2 ? "eager" : "lazy"} decoding="async" />{photoIndex === 8 && photos.length > 9 && <span>+{photos.length - 9}</span>}</button></div>)}</div>}<h2>{record.wine}{record.year ? ` · ${record.year}` : ""}</h2><p>{record.note || "这一杯还没有写下品鉴感受。"}</p>{confirmedFlavors.length > 0 && <div className="timeline-flavors">{confirmedFlavors.slice(0, 4).map((flavor) => <span key={flavor}>{flavor}</span>)}</div>}</div></article></RecordSwipe>; })}</div> : <p className="footprint-empty">这里还没有品鉴记录。</p>}</main></MobileScroll>{viewer && <div className="photo-viewer" role="dialog" aria-modal="true" aria-label={`${viewer.wine}照片详情`} onClick={() => setViewer(null)}><header><button onClick={() => setViewer(null)} aria-label="关闭照片详情">×</button><span>{viewer.index + 1} / {viewer.photos.length}</span></header><div className="photo-viewer-stage" onClick={(event) => event.stopPropagation()}>{viewer.photos.length > 1 && <button className="photo-viewer-prev" onClick={() => moveViewer(-1)} aria-label="上一张照片">‹</button>}<img src={viewer.photos[viewer.index]} alt={`${viewer.wine}照片详情`} />{viewer.photos.length > 1 && <button className="photo-viewer-next" onClick={() => moveViewer(1)} aria-label="下一张照片">›</button>}</div><footer>{viewer.wine}</footer></div>}</>;
 }
 
+type ShareAtlasStats = ReturnType<typeof getRecordStats>;
+
+function shareDateLabel() {
+  const parts = new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${value("year")}.${value("month")}.${value("day")}`;
+}
+
+async function loadSharePhoto(src: string) {
+  const response = await fetch(src);
+  if (!response.ok) throw new Error("照片读取失败");
+  return createImageBitmap(await response.blob());
+}
+
+function drawCoverPhoto(context: CanvasRenderingContext2D, image: ImageBitmap, x: number, y: number, width: number, height: number) {
+  const scale = Math.max(width / image.width, height / image.height);
+  const sourceWidth = width / scale;
+  const sourceHeight = height / scale;
+  context.drawImage(image, (image.width - sourceWidth) / 2, (image.height - sourceHeight) / 2, sourceWidth, sourceHeight, x, y, width, height);
+}
+
+async function createShareAtlasBlob(displayName: string, stats: ShareAtlasStats, photos: string[]) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1080;
+  canvas.height = 1440;
+  const context = canvas.getContext("2d", { alpha: false });
+  if (!context) throw new Error("当前浏览器无法生成图片");
+  context.fillStyle = "#fbf7ef";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "#fffaf4";
+  context.strokeStyle = "#e2cec0";
+  context.lineWidth = 2;
+  context.beginPath();
+  context.roundRect(44, 44, 992, 1352, 28);
+  context.fill();
+  context.stroke();
+  context.fillStyle = "#756861";
+  context.font = "26px Georgia, serif";
+  context.letterSpacing = "8px";
+  context.fillText("MY WINE JOURNAL", 92, 145);
+  context.fillStyle = "#7e1637";
+  context.font = "700 68px Georgia, 'Noto Serif SC', serif";
+  context.letterSpacing = "0px";
+  context.fillText(`${displayName} 的葡萄酒图鉴`, 92, 255, 896);
+  context.fillStyle = "#8a7b73";
+  context.font = "34px Georgia, 'Noto Serif SC', serif";
+  context.fillText("每一杯，都留下自己的风味记忆", 92, 330);
+  context.font = "32px system-ui, sans-serif";
+  const statsText = `${stats.recordCount} 次品鉴 · ${stats.grapeCount} 个品种 · ${stats.regionCount} 个产区`;
+  context.fillStyle = "#6e1733";
+  context.fillText(statsText, 92, 420);
+  const gap = 18;
+  const tileWidth = 286;
+  const tileHeight = 354;
+  const startX = 92;
+  const startY = 482;
+  const loaded = await Promise.all(photos.slice(0, 6).map(async (photo) => {
+    try { return await loadSharePhoto(photo); } catch { return null; }
+  }));
+  for (let index = 0; index < 6; index++) {
+    const x = startX + (index % 3) * (tileWidth + gap);
+    const y = startY + Math.floor(index / 3) * (tileHeight + gap);
+    context.save();
+    context.beginPath();
+    context.roundRect(x, y, tileWidth, tileHeight, 14);
+    context.clip();
+    context.fillStyle = "#eee7dc";
+    context.fillRect(x, y, tileWidth, tileHeight);
+    const image = loaded[index];
+    if (image) drawCoverPhoto(context, image, x, y, tileWidth, tileHeight);
+    context.restore();
+    image?.close();
+  }
+  context.strokeStyle = "#dfcec2";
+  context.beginPath();
+  context.moveTo(92, 1264);
+  context.lineTo(988, 1264);
+  context.stroke();
+  context.fillStyle = "#8b7d75";
+  context.font = "28px system-ui, sans-serif";
+  context.fillText("我的品鉴足迹", 92, 1330);
+  context.textAlign = "right";
+  context.fillText(`截至 ${shareDateLabel()}`, 988, 1330);
+  return new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("图片生成失败")), "image/png"));
+}
+
 function ShareAtlasScreen({ records, account, onBack }: { records: TastingRecord[]; account: WineAccount | null; onBack: () => void }) {
-  const [shared, setShared] = useState(false);
   const stats = getRecordStats(records);
-  const photos = records.flatMap((record) => record.photos ?? []).slice(0, 9);
+  const allPhotos = useMemo(() => [...new Set(records.flatMap((record) => record.photos ?? []))], [records]);
+  const [selectedPhotos, setSelectedPhotos] = useState<string[]>(() => allPhotos.slice(0, 6));
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [actionState, setActionState] = useState<"idle" | "saving" | "saved" | "shared" | "error">("idle");
   const displayName = account && !account.isAnonymous ? account.name : "葡萄酒探索者";
-  const share = async () => {
-    const text = `${displayName} 的葡萄酒图鉴：已点亮 ${stats.grapeCount} 个品种、${stats.regionCount} 个产区，完成 ${stats.recordCount} 次品鉴。`;
+  useEffect(() => { setSelectedPhotos((current) => current.length ? current.filter((photo) => allPhotos.includes(photo)).slice(0, 6) : allPhotos.slice(0, 6)); }, [allPhotos]);
+  const createImage = () => createShareAtlasBlob(displayName, stats, selectedPhotos);
+  const saveImage = async () => {
+    setActionState("saving");
     try {
-      if (navigator.share) await navigator.share({ title: "我的葡萄酒图鉴", text, url: window.location.href });
+      const url = URL.createObjectURL(await createImage());
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `我的葡萄酒图鉴-${shareDateLabel()}.png`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+      setActionState("saved");
+    } catch { setActionState("error"); }
+  };
+  const share = async () => {
+    setActionState("saving");
+    const text = `${displayName} 的葡萄酒图鉴：已完成 ${stats.recordCount} 次品鉴，点亮 ${stats.grapeCount} 个品种、${stats.regionCount} 个产区。`;
+    try {
+      const blob = await createImage();
+      const file = new File([blob], `我的葡萄酒图鉴-${shareDateLabel()}.png`, { type: "image/png" });
+      if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) await navigator.share({ title: "我的葡萄酒图鉴", text, files: [file] });
+      else if (navigator.share) await navigator.share({ title: "我的葡萄酒图鉴", text, url: window.location.href });
       else await navigator.clipboard.writeText(`${text} ${window.location.href}`);
-      setShared(true);
+      setActionState("shared");
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
+      if (error instanceof DOMException && error.name === "AbortError") { setActionState("idle"); return; }
+      setActionState("error");
     }
   };
-  return <MobileScroll className="app-scroll paper-screen"><main className="flow-content share-content"><FlowHeader title="分享我的图鉴" onBack={onBack} /><section className="share-card"><small>{displayName} 的葡萄酒世界</small><h2>每一杯，都让图鉴更完整</h2><p><strong>{stats.grapeCount}</strong> 个品种 · <strong>{stats.regionCount}</strong> 个产区 · <strong>{stats.recordCount}</strong> 次品鉴</p>{photos.length > 0 ? <div className="share-photo-grid">{photos.map((photo, index) => <img key={`${photo}-${index}`} src={photo} alt={`我的品鉴照片 ${index + 1}`} draggable={false} />)}</div> : <div className="share-empty"><CameraIcon /><span>记录并保存照片后，会自动出现在这里</span></div>}<footer>我的葡萄酒图鉴 · 初心版</footer></section><button className="primary-action" onClick={() => void share()}>{shared ? "已准备好分享" : "分享给朋友"}</button><p className="share-tip">分享卡片只展示你真实保存过的照片，缩略图统一为 1:1。</p></main></MobileScroll>;
+  const togglePhoto = (photo: string) => { setActionState("idle"); setSelectedPhotos((current) => current.includes(photo) ? current.filter((item) => item !== photo) : current.length < 6 ? [...current, photo] : current); };
+  const actionMessage = actionState === "saving" ? "正在生成图鉴图片…" : actionState === "saved" ? "图片已保存" : actionState === "shared" ? "已准备好分享" : actionState === "error" ? "图片生成失败，请稍后重试" : "选择想分享的品鉴瞬间";
+  return <><MobileScroll className="app-scroll paper-screen"><main className="flow-content share-content"><FlowHeader title="分享我的图鉴" onBack={onBack} /><section className="share-card"><small className="share-card-kicker">MY WINE JOURNAL <i /></small><h2>{displayName} 的葡萄酒图鉴</h2><p className="share-card-subtitle">每一杯，都留下自己的风味记忆</p><p className="share-card-stats"><strong>{stats.recordCount}</strong> 次品鉴 <b>·</b> <strong>{stats.grapeCount}</strong> 个品种 <b>·</b> <strong>{stats.regionCount}</strong> 个产区</p>{selectedPhotos.length > 0 ? <div className="share-photo-grid">{Array.from({ length: 6 }, (_, index) => selectedPhotos[index] ? <img key={selectedPhotos[index]} src={selectedPhotos[index]} alt={`我的品鉴照片 ${index + 1}`} draggable={false} /> : <span className="share-photo-empty" key={`empty-${index}`}><CameraIcon /></span>)}</div> : <div className="share-empty"><CameraIcon /><span>记录并保存照片后，会自动出现在这里</span></div>}<footer><span>我的品鉴足迹</span><span>截至 {shareDateLabel()}</span></footer></section>{allPhotos.length > 0 && <button className="share-edit" onClick={() => setEditorOpen(true)}><Pencil2Icon /> 编辑照片</button>}<p className={`share-action-status ${actionState === "error" ? "is-error" : ""}`} role="status">{actionMessage}</p><div className="share-actions"><button className="share-save" disabled={actionState === "saving"} onClick={() => void saveImage()}><DownloadIcon /> 保存图片</button><button className="share-send" disabled={actionState === "saving"} onClick={() => void share()}><Share2Icon /> 分享给朋友</button></div></main></MobileScroll><BottomSheet open={editorOpen} onOpenChange={setEditorOpen} title="编辑分享照片" description={`已选择 ${selectedPhotos.length}/6 张`} snap={0.66}><div className="share-photo-picker">{allPhotos.map((photo, index) => { const selected = selectedPhotos.includes(photo); const full = selectedPhotos.length >= 6 && !selected; return <button key={photo} className={selected ? "selected" : ""} disabled={full} onClick={() => togglePhoto(photo)} aria-pressed={selected} aria-label={`${selected ? "取消选择" : "选择"}第 ${index + 1} 张照片`}><img src={photo} alt="" />{selected && <span><CheckIcon /></span>}</button>; })}</div><button className="picker-done" onClick={() => setEditorOpen(false)}>完成</button></BottomSheet></>;
 }
 
 function splitRecordDate(value: string) {

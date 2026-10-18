@@ -1,6 +1,27 @@
 Page({
-  data: { result: '等待本地诊断', completed: false },
+  data: { result: '等待本地诊断', completed: false, loginBusy: false },
   onLoad() { this.runLocalDiagnostics(); },
+  async submitTestLogin(event) {
+    if (this.data.loginBusy) return;
+    let { email, password } = event.detail.value;
+    event.detail.value.password = '';
+    this.setData({ loginBusy: true });
+    try { await this.testEmailLogin(email.trim(), password); }
+    finally { email = undefined; password = undefined; this.setData({ loginBusy: false }); }
+  },
+  async testOwnPhoto(expectedEmail) {
+    const sdk = require('../../vendor/cloudbase/index.js');
+    const result = await require('../../owner-photo-probe.js')(sdk.init({ env: 'wine-app-d6grgbodge1334980' }), expectedEmail);
+    this.setData({ photoResult: JSON.stringify(result, null, 2) });
+    return result;
+  },
+  async testOwnRecord(expectedEmail) {
+    const sdk = require('../../vendor/cloudbase/index.js');
+    const app = sdk.init({ env: 'wine-app-d6grgbodge1334980' });
+    const result = await require('../../owner-record-probe.js')(app, expectedEmail);
+    this.setData({ recordResult: JSON.stringify(result, null, 2) });
+    return result;
+  },
   async testEmailLogin(email, password) {
     // Credentials are supplied only for this invocation, never put in page data or logs.
     const result = { stage: 'EMAIL_LOGIN_READ_ONLY', login: 'NOT_RUN', ownRead: 'NOT_RUN' };

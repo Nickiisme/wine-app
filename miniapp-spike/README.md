@@ -22,3 +22,15 @@ Evidence and the authoritative compatibility matrix: `../docs/miniapp-backend-co
 `pages/index/index.js:testEmailLogin(email,password)` is an opt-in runtime method, never called on startup. It authenticates an existing user against the original environment and, only after obtaining a UID, selects at most one own tasting record ID. It bypasses the Web profile upsert, has no writes and returns only sanitized outcome fields. Supply credentials transiently; never put them in source, project config, page data or evidence files. It tests email login, not WeChat login or identity linking. The startup diagnostic request count is not a cumulative network counter.
 
 2026-10-18 simulator result: email login returned code `unknown`; no UID obtained, no database query executed. See report for evidence and limitations.
+
+Latest 2026-10-18 evidence: after the user disabled local URL checking (`project.private.config.json`, `urlCheck:false`, base library 3.17.4), `testEmailLogin` returned `SUCCESS_WITH_UID`, `sessionMatchesLogin:true`, `ownRead:SUCCESS`, `returnedRows:0`. This verifies existing email login and an empty filtered query only. It does not verify WeChat identity binding, known-record visibility, cross-user RLS, real-device/domain compliance or release readiness. No business writes were made.
+
+## Scoped production test authorization and results
+
+The user explicitly authorized creating, modifying and cleaning only the two dedicated test accounts' test records/photos/inventory. Historical data, schema, policies and deployment remain out of scope. Second account registration is pending. The diagnostic login form accepts an existing account and never triggers writes; probe methods are only invoked explicitly.
+
+`owner-record-probe.js` uses the preallocated ID and name in `evidence/owner-record-manifest.json`. It refuses an existing visible ID and has exact-ID/owner/name filters plus finally cleanup. Full payload failed because `field_metadata` was absent from the API schema cache. The legacy payload passed create/read/update/soft-delete. One soft-deleted test row remains in the database; this is NOT physical deletion. Do not rerun the record probe or remove its manifest until retention/purge is resolved.
+
+`owner-photo-probe.js` checks nonexistence first, uploads only the generated PNG to the manifest path, and deletes in finally followed by exists verification. Local-path string input returned non-PNG content (HTTP200/65 bytes). ArrayBuffer input returned PNG (HTTP200/68 bytes) and passed. Signed response uses `fullSignedURL`; actual expiry and cross-user denial are untested. All uploaded probe files were deleted and verified.
+
+Cellar testing is deferred: checked SQL grants no client delete for cellar entries/movements. A narrowly scoped operator cleanup procedure is needed before creating inventory fixtures; do not grant broad delete or change RLS to make tests pass.

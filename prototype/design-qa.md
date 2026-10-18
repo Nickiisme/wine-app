@@ -1,61 +1,26 @@
-# Design QA
+# Label-camera layout QA — 2026-10-18
 
-- Source visual truth: `/Users/nicki/.codex/generated_images/01a132f8-eee2-7920-a503-793e02a85727/exec-d846be24-5720-430f-978c-622bbd6e8d59.png`
-- Implementation: `http://localhost:4173/`
-- Viewport: 1400 × 1200 browser viewport; phone screen verified at 393 × 852 CSS px, device scale factor 1
-- Source pixels: 853 × 1898; implementation phone viewport: 393 × 852 CSS px
-- Density normalization: compared at the phone-content level; the source is a taller concept image and the new detail states have no direct source frame
-- State: unlocked grape bottom sheet and France region zoom view
-- Browser evidence: in-app browser capture at 393 × 852; primary interactions tested; browser console checked with no warnings or errors
+- Source visual truth: `/var/folders/97/_xk916z5461gmldt5xzpfsg00000gn/T/codex-clipboard-b6b91b96-70ff-4026-8c6f-366b917dfeef.png` (864 × 1821).
+- Implementation screenshot: `camera-layout-preview.png` (393 × 720 CSS/pixel crop, no device chrome; browser viewport 1280 × 720).
+- Implementation: http://127.0.0.1:4175/ in Codex in-app browser.
+- State: camera not activated. Reference shows live video; implementation intentionally preserves the existing explicit camera-permission/start action and uses no fake bottle photograph.
 
-## Full-view comparison
+## Comparison and checks
 
-The new states preserve the established cream paper background, burgundy accents, compact typography, rounded controls, and bottom navigation. The content density remains intentionally lighter than the original concept image, matching the later direction to reduce illustration dominance.
+Source and implementation were opened together. Proportional comparison only: viewport heights differ and the live-video state has not been captured, so this is not a completed same-state fidelity review.
 
-## Focused-region comparison
+- Typography: existing system type retained; centered title, clear white framing instruction, small manual-entry link.
+- Layout: full-height capture surface, four-corner guide, ivory bottom controls; album and round shutter remain visible without scrolling at 393 × 720.
+- Tokens: warm ivory, wine-red controls, white live-view controls; no surrounding app redesign.
+- Assets: Radix icons and real camera video element retained. No generated or placeholder bottle imagery.
+- Copy: the single framing instruction follows the request. Extra mock helper text and decorative panel handle omitted intentionally. System-camera fallback retained to preserve functionality.
+- Iteration: first rendered capture revealed low instruction contrast due to an inherited paragraph color. Explicit white applied; `camera-layout-preview.png` is the post-fix evidence, with readable white instruction.
+- Interactions checked: record entry opens capture; manual entry opens the existing empty confirmation form; returning and reopening works. Full reload loads the new layout. Camera/gallery/retake code paths retained, but hardware capture and file selection were not exercised.
+- Console: one earlier Vite hot-reload error remains in captured logs. Full reload and reopening succeeded; build/type checks pass. No conclusion about hardware-camera console behavior.
+- Checks: runtime integrity passed (28 protected files); TypeScript and production build passed; 20 existing business/auth/catalog/map/lifecycle tests passed.
 
-Focused checks were performed on the grape detail sheet and the enlarged country map. The grape image remains secondary to the text, while the country view retains the same map-card visual language and clearly exposes a back action. A direct pixel match is not applicable because neither interaction state exists in the source image.
+## Remaining verification
 
-## Findings
+Real camera permission, live-frame composition, capture, retake, gallery import, and recognition must be checked on the user's phone. No permission was granted or personal photo uploaded during this visual change. Full same-state visual QA remains blocked pending that check.
 
-- No P0/P1/P2 issues remain.
-- Typography: hierarchy and small-label weights are consistent with the existing app.
-- Spacing: the detail sheet and country map use the existing compact rhythm without crowding.
-- Colors: existing wine, paper, line, and muted tokens are reused.
-- Image quality: existing grape assets remain sharp at the reduced 92 px detail size.
-- Copy: unlocked, locked, and regional exploration states are explicit and concise.
-
-## Interaction checks
-
-- Clicking an unlocked grape opens its introduction, tasting count, and encountered regions.
-- Clicking a locked grape opens a clear “待探索” explanation without revealing a detailed profile.
-- Clicking a country enlarges the map into its regional view.
-- The enlarged map returns to the world map through the top-left back control.
-- Browser console: no warnings or errors.
-
-## Comparison history
-
-- Initial pass: no actionable P0/P1/P2 findings in the two added interaction states.
-
-## Follow-up polish
-
-- P3: future region nodes can use real geographic positions once production map data is introduced.
-
-## Badge redesign check (2026-10-15)
-
-- Source visual truth: `/var/folders/97/_xk916z5461gmldt5xzpfsg00000gn/T/codex-clipboard-2e15a296-c7e6-4033-81a5-0c017259aa4a.png` and the companion close-up reference supplied in chat.
-- Implementation screenshot: `/Users/nicki/Documents/ChatGPT/wine-app/prototype/tmp/badges-profile-preview.png`.
-- Viewport: 1280 × 720 desktop browser displaying the app's phone-width profile surface. Source: 941 × 1592 pixels; implementation screenshot: 1280 × 720 pixels. Comparison is of medal material and shape, not full-screen layout or pixel alignment.
-- State: new user, five locked badges. Earned artwork was also inspected as individual transparent assets at full resolution.
-- Full-view comparison: reference has a dark gallery and large medals; the app keeps its established ivory profile and compact carousel. The adapted medals preserve the hexagonal silhouette, raised metal rim, enamel center, and restrained embossed symbol.
-- Focused-region comparison: the three visible locked medals show their contours and distinct symbols at phone size. The reference's brighter metal treatment is reserved for earned badges; grayscale clearly marks locked items.
-- Typography: existing app heading and label hierarchy retained. Badge labels are short and fit within each carousel item.
-- Spacing: medal, title, and condition form a readable vertical group without crowding the footprint section.
-- Colors: burgundy, sage, ivory, and champagne gold adapt the reference's metal/enamel language to the current app palette.
-- Image quality: five transparent 1024 px medal assets display cleanly at 82 px; no visible background rectangle or stretching.
-- Copy: each badge names a concrete condition; the section shows the real earned count.
-- Browser check: profile navigation and carousel render; no console warnings or errors.
-- Comparison history: initial locked-state capture made medals too faint; opacity increased from .32 to .52 and the final profile was captured again.
-- Remaining gap: the live account has no saved records, so earned and in-progress states were verified from their assets and rendering rules rather than a live record sequence.
-
-final result: passed
+final result: blocked

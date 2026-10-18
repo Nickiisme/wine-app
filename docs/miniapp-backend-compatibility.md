@@ -4,20 +4,102 @@
 
 ## 结论与证据边界
 
+## 当前进展：已授权生产环境内限定测试（2026-10-18）
+
+用户明确授权“仅创建、修改和清理两个测试账号的测试记录、照片与库存”，取代先前对这些测试数据的写入禁令；历史数据、表结构、RLS、部署仍禁止改动。第二账号由用户注册中。后文“未写生产数据”“还需写入授权”等段落保留为历史，当前范围及最新结果以本节为准。
+
+**Conditional Go，仅继续验证。** 真实小程序模拟器、SDK 3.10.2、基础库 3.17.4、原环境，`urlCheck:false`。邮箱身份已可登录并执行部分数据操作，不代表微信登录绑定或完整越权安全通过。原 37 项矩阵是迁移审计基线；当前新增实测按以下扩展矩阵统计，不与基线相加。
+
+| 项目 | 状态 | 实测证据 / 未完成条件 |
+|---|---|---|
+| E1 邮箱登录取得 UID、会话一致 | PASS | `SUCCESS_WITH_UID`，`sessionMatchesLogin:true` |
+| E2 本人过滤查询接口 | PASS | 初次 `ownRead:SUCCESS,returnedRows:0`，仅接口可调用 |
+| E3 完整字段记录新增 | FAIL | `DATABASE_PGRST204: Could not find the 'field_metadata' column of 'tasting_records' in the schema cache`，两次尝试（第二次补充错误摘要） |
+| E4 旧表兼容载荷新增 | PASS | 去除 grapes/field_metadata，`insertOwn:PASS` |
+| E5 读取已知存在的本人记录 | PASS | 精确 ID 返回一条，note 与插入值相等 |
+| E6 更新本人记录 | PASS | 修改 note 后按 ID 再读验证新值 |
+| E7 软删除本人记录 | PASS | deleted_at 非空，活动过滤查询返回零行 |
+| E8 本地路径字符串上传后的内容正确性 | FAIL | 上传接口成功，但签名下载 HTTP200、65字节、PNG头不匹配；不能认定图片正确上传 |
+| E9 ArrayBuffer 上传 | PASS | 本地合成 PNG 经 readFileSync 读字节后上传，路径与预期一致 |
+| E10 本人照片签名 | PASS | 实际返回键 `fullSignedURL`，请求有效期60秒；未输出 URL |
+| E11 字节上传后的签名访问 | PASS | HTTP200、68字节、PNG头 `[137,80,78,71,13,10,26,10]` |
+| E12 测试照片清理 | PASS | remove 后 exists:false；小程序本地测试文件也删除 |
+| E13 双账号越权与伪造 uid | BLOCKED | 第二专用账号正在注册，未使用历史数据作为越权目标 |
+| E14 临时链接到期拒绝访问 | BLOCKED | 未等待实际到期；文件清理后不能替代过期验证 |
+| E15 库存 RPC / 重试 / 原子性 | BLOCKED | 仓库 SQL 不授予普通客户端 cellar_entries/movements 删除权限；先确定精确测试夹具的操作员清理路径，不放宽 RLS |
+| E16 OCR 小程序图片调用 | BLOCKED | 本轮未调用 OCR，现有 Base64 接口仍待测 |
+| E17 微信身份、Web UID 延续或绑定、正常域名真机链路 | BLOCKED | 本轮仅既有邮箱身份和关闭本地域名检查的模拟器 |
+
+扩展矩阵：**PASS 10 / FAIL 2 / BLOCKED 5**。失败不代表整个后端不可复用：E3 暴露字段完整性差异，E8 暴露上传适配差异。不得把兼容载荷或 ArrayBuffer 成功覆盖原失败。
+
+### 入口与证据
+
+- 记录入口：`miniapp-spike/miniprogram/pages/index/index.js:testOwnRecord` → `owner-record-probe.js`；工具 `automation_evaluate → getCurrentPages()`，调用返回 `ok:true,result.success:true`，以内部 steps 为业务结果。
+- 本轮固定测试记录 ID：`32b47abb-7a3d-471a-987b-837f5eae69b0`，wine_name 为 `[MINIAPP-SPIKE] 32b47abb-7a3d-471a-987b-837f5eae69b0`。会话 email 必须匹配预期测试账号；不在报告记录邮箱、UID、密码或令牌。所有更新/清理条件同时匹配 id、user_id、wine_name；新建前按 ID 检查无可见记录，验证清理字段存在。没有调用 Web profiles upsert。
+- 记录请求：insert 兼容载荷 → 精确 ID select 校验 → update note → 再读 → finally update deleted_at → 确认原行已软删、活动查询无行。结果 `insertOwn/readKnownOwn/updateOwn/softDeleteOwn:PASS`、`cleanup:SOFT_DELETED_VERIFIED`。
+- 照片入口：`testOwnPhoto` → `owner-photo-probe.js`。`tasting-photos/{testUid}/{runId}/miniapp-probe.png`（桶和对象路径分开传），合成1×1 PNG，无真实用户照片。先 exists:false，upload，createSignedUrl(path,60)，wx.request 下载检查字节，finally remove 与 exists 校验。未测试批量签名、跨账号或历史 Web 照片。
+- 实验代码自身曾错误假设 list 返回数组，返回 `existing.some is not a function`，当次未上传；修正为 SDK exists 后继续。签名声明示例为 signedUrl，实际对象仅含 fullSignedURL；根据实测修正后验证下载。以上属于诊断代码修正，不能计作生产故障。
+- 小程序本地路径参数下载内容65字节并非 PNG，是否被作为路径文本上传仍属推断，未记录该内容；ArrayBuffer 方式下载68字节且PNG头正确，成为当前推荐上传方式。首轮仅“上传成功”的阶段性观察由内容校验结果补充，不能单独算完整上传 PASS。
+
+### 清理与后续
+
+测试图片已物理删除并验证不存在。**一条测试品鉴记录仅软删除，仍保留于数据库回收站，不声称完全清空**。由于当前客户端物理删除被生命周期迁移撤销，保留 `miniapp-spike/evidence/owner-record-manifest.json` 供后续按精确 ID 核对/清理。没有创建库存测试夹具。没有修改历史记录、生产结构、RLS 或正式 Web 代码。
+
+后续需要：第二测试账号；库存测试前可执行的定点清理方案。允许继续仅测试数据的验证，无须重复申请相同授权。生产正式域名修改配额阻塞仍待解决；本地校验跳过不满足发布门槛。
+
+必须适配/核对项新增：核实线上 field_metadata 是否缺失或 schema cache 未刷新（本轮不迁移生产表）；图片上传显式读取 ArrayBuffer；签名响应归一化 fullSignedURL。这些仅在实验代码中实现，正式 API 未修改。
+
+
 ## 2026-10-18 补充：现有环境邮箱登录尝试
+
+### 最新实测：关闭本地域名校验后登录与空结果查询成功
+
+用户确认已勾选本地“不校验合法域名”；读取 `miniapp-spike/project.private.config.json` 确认 `setting.urlCheck:false`、基础库 `3.17.4`。这是用户的本地调试设置，不修改生产 RLS 或云端域名配置。agent 调用 `simulator_refresh` 后，通过 `automation_evaluate → getCurrentPages() → testEmailLogin` 使用同一个已有测试账号执行邮箱密码登录和本人记录只读查询，真实返回：
+
+```json
+{
+  "stage": "EMAIL_LOGIN_READ_ONLY",
+  "login": "SUCCESS_WITH_UID",
+  "ownRead": "SUCCESS",
+  "phase": "selectOwnRecord",
+  "sessionMatchesLogin": true,
+  "returnedRows": 0
+}
+```
+
+环境：`wine-app-d6grgbodge1334980`；AppID：`wx5c33b5cc2b34a20a`；SDK：3.10.2。入口：`miniapp-spike/miniprogram/pages/index/index.js:testEmailLogin`。请求顺序为 `app.auth().signInWithPassword({email,password})`、`auth.getSession()`、`app.rdb().from('tasting_records').select('id').eq('user_id',uid).limit(1)`。未输出 UID、令牌、密码或原始登录响应；未调用 Web 的 profiles upsert，没有写入、上传、OCR 或库存扣减。
+
+**当前补充矩阵 E1 PASS / E2 PASS，共 PASS 2、FAIL 0、BLOCKED 0**，但范围限定为“关闭本地域名检查的模拟器中，既有邮箱账号登录并获得 UID”和“本人过滤查询返回成功且零行”。E2 的零行既可能是无数据，也可能受 RLS 过滤，不能证明用户能读取已知存在的记录，更不能证明跨用户隔离。没有与 Web 实测 UID 对照，没有微信登录或账号绑定，没有登出重登稳定性证据。正常域名校验、真机及发布链路仍 BLOCKED。
+
+原 37 项主矩阵保持 PASS 0 / FAIL 0 / BLOCKED 29 / INFERRED 8，不把邮箱身份与空结果查询冒充微信身份下完整 RLS 验证。最终仍 Conditional Go，仅继续技术验证。接下来需要第二个专用测试账号，以及对“仅两个测试账号的标记记录/照片/库存进行创建、互访、更新、删除和清理”的明确写入范围授权；未获授权前继续遵守生产业务数据不变。
+
+以下域名失败和早期矩阵为历史记录，当前 E1/E2 以上述最新实测为准。
+
+
+最新外部阻塞：用户在 CloudBase 小程序详情提交 request 域名后，截图显示 `lowcode/SetServerDomain` / `FailedOperation`，服务商平台每月只可修改 50 次，已超限制，本月无渠道新增次数、只能下月修改。页面说明此次数由微信服务商平台统一限制，与平台内其他小程序共享；不能归因于用户本人进行了 50 次修改。截图 requestId：`95659c74-26d6-4b89-a16c-4a5a8f26c598`。该域名保存未成功，E1/E2 继续 BLOCKED。没有重复提交、解除授权或更改生产资源。
+
+可选后续：仅在诊断项目本地开发者工具中临时跳过域名校验，验证邮箱登录/本人只读查询；这种证据必须注明绕过了本地域名检查，不能计作正常域名校验下的真机或发布通过。正式域名配置仍需由平台支持核实处理或待额度恢复后完成。当前尚未执行此本地配置变更。
+
+后续用户截图补充：微信公众平台“服务器域名”显示“服务器域名已托管给第三方，不能在此进行管理”；第三方设置列出“腾讯云官网”和“微搭低代码”。因此上一段微信后台直接编辑路径不适用于当前托管状态。用户先前 CloudBase 小程序认证成功截图中，目标小程序行右侧已有“域名配置”入口；下一步应从原 `wine-app` 环境进入该入口检查 request 域名配置。尚未读取其编辑页或保存结果，不推断具体托管权限归属，不解除第三方授权。
+
+最新诊断（用户提供微信运行时日志，基础库 3.17.4）：`https://wine-app-d6grgbodge1334980.api.tcloudbasegateway.com` 不在 request 合法域名列表中。已确认存在客户端域名拦截，不能将此前 `unknown` 解释为密码错误或服务端身份验证失败。E1 由尝试结果 FAIL 修正为当前兼容性验证 BLOCKED，保留原失败摘要作为历史证据；配置域名后仍须重新执行验证。
+
+最小修复操作：在 AppID `wx5c33b5cc2b34a20a` 的微信小程序后台“开发管理 → 开发设置 → 服务器域名 → request 合法域名”追加该完整 HTTPS 域名，保留已有域名；随后在开发者工具同步项目域名信息并重新编译。继续保持域名校验开启。此次没有修改远程配置，也没有在拦截状态下再次提交凭据。
+
+官方参考：[CloudBase HTTP API 地址](https://docs.cloudbase.net/http-api/basic/overview)、[官方小程序域名配置入口说明](https://docs.cloudbase.net/api-reference/webv2/adapter/uniapp-adapter)。具体需配置的域名来自本次真实错误日志，不照搬不同版本适配器的示例域名。
 
 用户提供了一个测试账号，授权用于验证。凭据未写入项目文件或本报告。本轮未注册用户、未写 profiles、未上传、未调用 OCR、未执行写入 SQL/RPC；尚未取得第二个账号或测试数据写入范围授权。
 
 | 项目 | 状态 | 证据 |
 |---|---|---|
-| E1：现有邮箱账号在小程序模拟器中登录 | FAIL | 官方 SDK 3.10.2 `app.auth().signInWithPassword` 实际返回错误；两次受控执行均未得到 UID，首次摘要 `code:unknown`，补充脱敏 message 后为 `code:unknown,message:No message` |
+| E1：现有邮箱账号在小程序模拟器中登录 | BLOCKED | 已有用户日志确认 request 合法域名拦截；历史尝试： 官方 SDK 3.10.2 `app.auth().signInWithPassword` 实际返回错误；两次受控执行均未得到 UID，首次摘要 `code:unknown`，补充脱敏 message 后为 `code:unknown,message:No message` |
 | E2：登录后只读本人 tasting_records | BLOCKED | 登录未成功，查询没有执行，`ownRead:NOT_RUN` |
 
 入口：`miniapp-spike/miniprogram/pages/index/index.js:testEmailLogin`，环境 `wine-app-d6grgbodge1334980`，请求方式为小程序版官方 SDK 邮箱密码登录（不是微信登录）。通过 `automation_evaluate` 从 `getCurrentPages()` 取得当前页执行，工具返回 `ok:true,result.success:true`，业务结果 `login:ERROR,phase:signInWithPassword`。工具成功只表示诊断函数执行成功。未取得服务端 requestId、HTTP 状态或有效 UID；未知错误不足以断定密码错误、域名错误或 SDK 不兼容。
 
 `automation_page_action callMethod` 曾返回 `No context found for objectId 1`；随后受控 evaluate 验证方法存在且 `authResult:null`，改用 evaluate 才取得上述业务结果。CLI 的 `--args` 被拒绝，使用内存管道传入 `--args-file`，未创建凭据文件。console 对 `domain` / `合法` 的筛选均为空，不能据此排除网络配置问题。
 
-独立补充矩阵：PASS 0 / FAIL 1 / BLOCKED 1。原 37 项主矩阵仍为 PASS 0 / FAIL 0 / BLOCKED 29 / INFERRED 8（原矩阵要求微信身份及隔离环境，不将邮箱登录尝试冒充微信登录测试）。总体仍为 Conditional Go，仅继续验证。
+独立补充矩阵（域名日志更新后）：PASS 0 / FAIL 0 / BLOCKED 2。原 37 项主矩阵仍为 PASS 0 / FAIL 0 / BLOCKED 29 / INFERRED 8（不将邮箱登录尝试冒充微信登录测试）。总体仍为 Conditional Go，仅继续验证。
 
 现有 Web 的 `acceptAccount → syncProfile` 会 upsert profiles，本轮绕开该封装以保留生产业务数据不变。诊断项目启动仍仅运行本地检查；显式调用 testEmailLogin 才会发起登录，成功后最多只读本人一条记录 ID，不输出记录、UID 或令牌。页面本地检查的零请求字段只对应启动检查，不代表显式登录后的累计请求数。
 

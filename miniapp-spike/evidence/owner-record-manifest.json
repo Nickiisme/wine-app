@@ -1,0 +1,42 @@
+{
+  "runId": "32b47abb-7a3d-471a-987b-837f5eae69b0",
+  "recordId": "32b47abb-7a3d-471a-987b-837f5eae69b0",
+  "wineName": "[MINIAPP-SPIKE] 32b47abb-7a3d-471a-987b-837f5eae69b0",
+  "environment": "wine-app-d6grgbodge1334980",
+  "status": "SOFT_DELETED_VERIFIED",
+  "cleanup": "soft-delete only; physical purge not available to client",
+  "history": [
+    {
+      "status": "FAIL",
+      "code": "DATABASE_PGRST204",
+      "message": "Could not find the 'field_metadata' column of 'tasting_records' in the schema cache",
+      "cleanup": "NO_VISIBLE_ROW",
+      "attempts": 2
+    }
+  ],
+  "recordSteps": {
+    "insertOwn": "PASS",
+    "readKnownOwn": "PASS",
+    "updateOwn": "PASS",
+    "softDeleteOwn": "PASS"
+  },
+  "photo": {
+    "pathTemplate": "{testUid}/32b47abb-7a3d-471a-987b-837f5eae69b0/miniapp-probe.png",
+    "localPathInput": {
+      "httpStatus": 200,
+      "bytes": 65,
+      "pngSignature": false,
+      "status": "FAIL"
+    },
+    "arrayBufferInput": {
+      "httpStatus": 200,
+      "bytes": 68,
+      "pngSignature": true,
+      "status": "PASS"
+    },
+    "signedResponseKey": "fullSignedURL",
+    "requestedExpirySeconds": 60,
+    "expiryTested": false,
+    "cleanup": "DELETED_VERIFIED"
+  }
+}

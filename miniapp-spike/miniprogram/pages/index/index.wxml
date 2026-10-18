@@ -1,8 +1,14 @@
 <view class="container">
   <view class="title">CloudBase 本地诊断</view>
-  <view>仅检查 AppID 和官方 SDK 加载，不发起业务登录或云端请求。</view>
+  <view>启动仅检查本地能力。下方表单只执行登录及本人记录只读查询。</view>
   <button bindtap="runLocalDiagnostics">重新检查本地能力</button>
+  <form wx:if="{{!loginBusy}}" bindsubmit="submitTestLogin">
+    <input name="email" placeholder="专用测试账号邮箱" />
+    <input name="password" password placeholder="密码（不写入项目文件）" />
+    <button form-type="submit">登录测试账号并只读查询</button>
+  </form>
+  <view wx:else>正在验证登录…</view>
   <text id="diagnostics" selectable>{{result}}</text>
   <text selectable>{{authResult}}</text>
-  <view class="note">UID、RLS、照片、OCR、库存事务仍需独立测试环境验证。</view>
+  <view class="note">本地域名检查已跳过。仅两个测试账号的标记数据获准写入；跨账号权限、OCR 和库存事务待验证。</view>
 </view>

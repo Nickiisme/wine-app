@@ -963,26 +963,47 @@
 .first-taste-insight.collection { background: #f4eee5; }
 .first-taste-insight.personal { background: #f2e7e9; }
 
-.share-content { padding-bottom: 70px; }
+.share-content { padding-bottom: 42px; }
 
 .share-card {
-  padding: 24px 20px 18px;
-  border: 1px solid rgba(126, 22, 55, .11);
-  border-radius: 25px;
-  background: rgba(255, 250, 244, .82);
-  box-shadow: 0 10px 28px rgba(69, 43, 34, .09);
+  padding: 30px 18px 17px;
+  border: 1px solid rgba(126, 22, 55, .16);
+  border-radius: 10px;
+  background: rgba(255, 250, 244, .9);
+  box-shadow: 0 9px 26px rgba(69, 43, 34, .07);
 }
 
-.share-card > small { color: #8d7f77; font-size: 10px; letter-spacing: .4px; }
-.share-card h2 { margin: 8px 0 10px; color: #5d1028; font: 700 22px/1.3 Georgia, "Noto Serif SC", serif; }
-.share-card > p { margin: 0 0 17px; color: #756861; font-size: 11px; }
-.share-card > p strong { color: #7e1637; font-size: 15px; }
+.share-card-kicker { display: flex; align-items: center; gap: 12px; color: #6f625b; font: 600 9px/1 Georgia, serif; letter-spacing: 3px; }
+.share-card-kicker i { width: 17px; height: 1px; background: #d8c2b4; }
+.share-card h2 { margin: 13px 0 7px; color: #7e1637; font: 700 27px/1.22 Georgia, "Noto Serif SC", serif; letter-spacing: -.5px; }
+.share-card-subtitle { margin: 0 0 17px; color: #85766e; font: 500 13px/1.45 Georgia, "Noto Serif SC", serif; letter-spacing: .7px; }
+.share-card-stats { margin: 0 0 18px; color: #756861; font-size: 11px; }
+.share-card-stats strong { color: #7e1637; font: 700 20px/1 Georgia, serif; }
+.share-card-stats b { padding: 0 2px; color: #a29289; font-weight: 400; }
 .share-photo-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
-.share-photo-grid img { display: block; width: 100%; aspect-ratio: 1; border-radius: 7px; object-fit: cover; }
+.share-photo-grid img,
+.share-photo-empty { display: grid; place-items: center; width: 100%; aspect-ratio: .82; border-radius: 7px; object-fit: cover; background: #eee7dc; color: #b5a79e; overflow: hidden; }
+.share-photo-empty svg { width: 18px; height: 18px; }
 .share-empty { min-height: 174px; border-radius: 16px; background: #eee8df; color: #91857e; display: grid; place-items: center; align-content: center; gap: 9px; text-align: center; font-size: 10px; }
 .share-empty svg { width: 24px; height: 24px; }
-.share-card footer { margin-top: 18px; color: #a2948c; font-size: 9px; text-align: right; }
-.share-tip { margin: 11px 12px 0; color: #998d86; font-size: 9px; line-height: 1.6; text-align: center; }
+.share-card footer { display: flex; justify-content: space-between; margin-top: 20px; padding-top: 14px; border-top: 1px solid #dfd0c5; color: #91827a; font-size: 10px; }
+.share-edit { display: flex; align-items: center; gap: 7px; margin: 15px 4px 0 auto; padding: 5px 0; border: 0; background: transparent; color: #7e1637; font-size: 12px; font-weight: 650; }
+.share-edit svg { width: 16px; height: 16px; }
+.share-action-status { min-height: 16px; margin: 18px 0 11px; color: #998d86; font-size: 10px; text-align: center; }
+.share-action-status.is-error { color: #a13b3b; }
+.share-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.share-actions button { min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 7px; border-radius: 24px; font-size: 12px; font-weight: 700; }
+.share-actions button svg { width: 17px; height: 17px; }
+.share-actions button:disabled { opacity: .58; }
+.share-save { border: 1px solid #7e1637; background: #fffaf4; color: #7e1637; }
+.share-send { border: 1px solid #7e1637; background: #8d153e; color: #fff; box-shadow: 0 8px 20px rgba(126, 22, 55, .18); }
+.share-photo-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.share-photo-picker button { position: relative; padding: 0; border: 2px solid transparent; border-radius: 11px; background: #eee7dc; overflow: hidden; }
+.share-photo-picker button.selected { border-color: #8d153e; }
+.share-photo-picker button:disabled { opacity: .42; }
+.share-photo-picker img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
+.share-photo-picker button > span { position: absolute; top: 5px; right: 5px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: #8d153e; color: #fff; }
+.share-photo-picker button > span svg { width: 12px; height: 12px; }
 
 .record-camera-flow { padding: 3px 0 18px; }
 
@@ -1114,6 +1135,136 @@
 .wine-app .flow-content { padding-top: 24px; }
 .wine-app .success-content { padding-top: 48px; }
 .wine-app .bottom-nav { height: 72px; padding-bottom: 4px; }
+
+/* Profile dashboard: keep every existing destination while prioritizing records, cellar and calendar. */
+.wine-app .profile-dashboard {
+  min-height: 100%;
+  padding: 34px 22px 116px;
+}
+
+.profile-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.profile-topbar .eyebrow { font-size: 26px; }
+.profile-settings {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #342a27;
+}
+.profile-settings svg { width: 26px; height: 26px; }
+.profile-settings:active { background: rgba(126, 22, 55, .07); }
+
+.profile-identity {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  margin-top: 24px;
+}
+.profile-avatar {
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #f0e1e4;
+  color: #8b153a;
+  font: 700 30px Georgia, "Noto Serif SC", serif;
+}
+.profile-identity h1 { margin: 0 0 6px; color: #2f2724; font: 700 22px Georgia, "Noto Serif SC", serif; }
+.profile-identity p { margin: 0; color: #8b7d75; font-size: 11px; line-height: 1.5; }
+
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: 22px;
+  padding: 14px 4px;
+  border-radius: 17px;
+  background: rgba(255, 251, 245, .74);
+  box-shadow: 0 8px 25px rgba(74, 50, 40, .045);
+}
+.profile-stats button {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  border: 0;
+  border-right: 1px solid #e7ddd2;
+  background: transparent;
+  color: #786b64;
+}
+.profile-stats button:last-child { border-right: 0; }
+.profile-stats button:active { background: rgba(126, 22, 55, .05); }
+.profile-stats strong { color: #8b153a; font: 700 24px Georgia, serif; }
+.profile-stats span { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+
+.profile-life { margin-top: 26px; }
+.profile-life > h2,
+.profile-badges .section-title h2 { margin: 0; color: #2f2724; font: 700 21px Georgia, "Noto Serif SC", serif; }
+.profile-life-list { margin-top: 10px; }
+.profile-life-list > button {
+  width: 100%;
+  min-height: 74px;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  border-bottom: 1px solid #e6dcd1;
+  padding: 10px 2px;
+  background: transparent;
+  color: #342a27;
+  text-align: left;
+}
+.profile-life-list > button:active { background: rgba(126, 22, 55, .035); }
+.profile-life-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  color: #9a1742;
+}
+.profile-life-icon svg { width: 31px; height: 31px; stroke-width: 1.2; }
+.profile-life-copy { min-width: 0; display: grid; gap: 4px; }
+.profile-life-copy strong { color: #2f2724; font: 700 16px Georgia, "Noto Serif SC", serif; }
+.profile-life-copy small { overflow: hidden; color: #8b7d75; font-size: 11px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.profile-chevron { color: #887a72; font-size: 27px; font-weight: 300; }
+
+.wine-app .profile-badges { margin-top: 24px; }
+.profile-badges .section-title { margin-bottom: 8px; }
+.profile-badges .badge-count { color: #776b65; font-size: 12px; }
+.profile-badges .badge-row { gap: 4px; padding-bottom: 4px; }
+.profile-badges .badge-item { flex-basis: 104px; min-width: 104px; }
+.profile-badges .badge-medal { width: 76px; height: 76px; }
+.profile-badges .badge-item small { display: none; }
+
+.profile-secondary { margin-top: 20px; border-top: 1px solid #e6dcd1; }
+.profile-secondary button {
+  width: 100%;
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 0;
+  border-bottom: 1px solid #e6dcd1;
+  background: transparent;
+  color: #5d514b;
+  font-size: 12px;
+}
+.profile-secondary button span { color: #8b7d75; font-size: 20px; }
+
+@media (max-width: 360px) {
+  .wine-app .profile-dashboard { padding-right: 18px; padding-left: 18px; }
+  .profile-life-copy small { font-size: 10px; }
+  .profile-badges .badge-item { flex-basis: 98px; min-width: 98px; }
+}
 
 .flavor-profile { padding-bottom: 74px; }
 
