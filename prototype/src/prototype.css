@@ -10,7 +10,8 @@
 .flavor-group-grid button small { display: block; margin-top: 2px; color: var(--wine); font-size: 9px; font-weight: 500; }
 .flavor-drilldown { margin-top: 10px; padding: 11px; border: 1px solid #e4d8ce; border-radius: 16px; background: rgba(255, 250, 244, .62); }
 .flavor-drilldown p { margin: 0 0 9px; color: var(--muted); font-size: 10px; }
-.settings-group .settings-link { width: 100%; padding: 0; border: 0; border-bottom: 1px solid #e3d9ce; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.settings-group .settings-link { width: 100%; min-height: 51px; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 0; border: 0; border-bottom: 1px solid #e3d9ce; background: transparent; color: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.settings-group .settings-link:focus-visible { outline: 2px solid var(--wine); outline-offset: 2px; }
 .privacy-content { padding-bottom: 56px; }
 .privacy-updated { margin: -5px 0 22px; color: var(--muted); font-size: 10px; text-align: center; }
 .privacy-intro { padding: 17px 16px; border: 1px solid #eadfd4; border-radius: 18px; background: #fffaf3; }
