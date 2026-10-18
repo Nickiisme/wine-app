@@ -19,7 +19,37 @@
 - BLOCKED：缺少外部运行条件，未发出请求；没有返回值、错误码或 requestId。
 - INFERRED：仅源码、SDK 声明、SQL 或官方文档提供依据，不能替代集成验证。
 
-没有修改 prototype 页面、样式、后端实现、数据库、RLS 或生产数据；没有部署、发布、提交审核。没有关闭 RLS，没有引入高权限客户端凭证。未生成实验小程序：当前环境/身份接入分支尚未确定，避免提供看似可运行但未经验证的 SDK 拼接代码。
+没有修改 prototype 页面、样式、后端实现、数据库、RLS 或生产数据；没有部署、发布、提交审核。没有关闭 RLS，没有引入高权限客户端凭证。已创建独立 `miniapp-spike/` 本地诊断小程序，未迁移业务页面。它只读取当前 AppID、检查 wx.cloud 与官方 SDK 导出；不初始化 CloudBase、不登录、不获取 UID、不调用云端业务。真实后端验证仍需独立测试环境。
+
+## 2026-10-18 独立诊断项目
+
+- 新建 `miniapp-spike/`，AppID 为 `wx5c33b5cc2b34a20a`，候选环境仅显示 `wine-app-d6grgbodge1334980`，不连接。
+- `scripts/prepare-sdk.py` 从现有依赖复制官方 SDK 3.10.2 的完整 `miniprogram_dist`，实际执行成功；产物 vendor 被忽略，不引入任何凭证。
+- `wechatide -c Codex project_import --project /Users/nicki/Documents/ChatGPT/wine-app/miniapp-spike` 真实返回 `ok:true,success:true,alreadyImported:false,projectName:"wine-backend-spike"`。导入成功只是本地工具证据，不计入主业务矩阵。
+- `open_project_window --project /Users/nicki/Documents/ChatGPT/wine-app/miniapp-spike --window-mode fullMode` 返回 `ok:true,success:true,type:newopen,winId:s0`。
+- 随后 `automation_page_action --project /Users/nicki/Documents/ChatGPT/wine-app/miniapp-spike --action getData --wait-for-selector #diagnostics` 返回 `ok:true,success:true,completed:true`；真实模拟器页面数据如下。此项本地运行检查 **PASS**，独立于主业务矩阵，不代表真实后端 PASS。
+
+```json
+{
+  "stage": "LOCAL_ONLY",
+  "appId": "wx5c33b5cc2b34a20a",
+  "expectedAppId": "wx5c33b5cc2b34a20a",
+  "candidateEnvironment": "wine-app-d6grgbodge1334980",
+  "environmentInitialized": false,
+  "sdkVersion": "3.10.2",
+  "cloudBaseUid": "NOT_REQUESTED",
+  "loginStatus": "NOT_REQUESTED",
+  "businessRequestsExecuted": 0,
+  "cloudInitialized": false,
+  "wxCloudAvailable": true,
+  "sdkLoaded": true,
+  "sdkInitAvailable": true
+}
+```
+
+调用入口为 `miniapp-spike/miniprogram/pages/index/index.js:onLoad → runLocalDiagnostics`，请求方式为本地 SDK `require` 和 `wx.getAccountInfoSync()`；未调用云端业务 API。版本字符串由准备脚本校验，本地页不能代替 SDK 网络能力验证。`businessRequestsExecuted` 是页面代码固定的本地阶段说明，非抓包计数。
+
+下一步外部条件：独立非生产 CloudBase PostgreSQL 环境（包含匹配的表/RLS/RPC、私有桶与 OCR 函数）及两个测试用户；提供环境 ID 并在开发者工具完成相应授权即可，勿在聊天发送密码或密钥。当前未授权部署，因此不自动初始化这些云端资源。
 
 ## 1. 实际代码定位与本地证据
 

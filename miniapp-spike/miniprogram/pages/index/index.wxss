@@ -1,0 +1,5 @@
+.container { padding: 32rpx; line-height: 1.6; }
+.title { font-size: 36rpx; font-weight: bold; margin-bottom: 24rpx; }
+button { margin: 24rpx 0; }
+#diagnostics { display: block; white-space: pre-wrap; font-family: monospace; font-size: 24rpx; }
+.note { margin-top: 24rpx; color: #666; }
