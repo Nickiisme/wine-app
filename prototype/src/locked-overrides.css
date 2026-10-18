@@ -622,6 +622,15 @@
 .auth-terms { margin: 24px 14px 0; color: #a0958e; font-size: 8px; line-height: 1.6; text-align: center; }
 
 .records-content { padding-bottom: 74px; }
+.records-header-dock {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  margin: -64px -20px 18px;
+  padding: 64px 20px 0;
+  background: var(--paper, #fbf7ef);
+}
+.records-header-dock .flow-header { margin-bottom: 0; }
 .records-summary { margin: -5px 3px 14px; color: #81756e; font-size: 11px; }
 
 .timeline-year {

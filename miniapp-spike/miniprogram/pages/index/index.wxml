@@ -1,14 +1,20 @@
 <view class="container">
-  <view class="title">CloudBase 本地诊断</view>
-  <view>启动仅检查本地能力。下方表单只执行登录及本人记录只读查询。</view>
-  <button bindtap="runLocalDiagnostics">重新检查本地能力</button>
+  <view class="title">测试账号登录</view>
+  <view class="intro">输入第二个账号的密码。此按钮只登录并读取本人记录，不创建测试数据。</view>
   <form wx:if="{{!loginBusy}}" bindsubmit="submitTestLogin">
-    <input name="email" placeholder="专用测试账号邮箱" />
-    <input name="password" password placeholder="密码（不写入项目文件）" />
-    <button form-type="submit">登录测试账号并只读查询</button>
+    <view class="field-label">邮箱</view>
+    <input id="test-email" class="field" name="email" value="4050639@qq.com" placeholder="测试账号邮箱" />
+    <view class="field-label">密码</view>
+    <input id="test-password" class="field" name="password" password placeholder="请输入该账号的密码" />
+    <view wx:if="{{formError}}" class="error">{{formError}}</view>
+    <button id="test-login" form-type="submit" type="primary">登录测试账号并只读查询</button>
   </form>
   <view wx:else>正在验证登录…</view>
-  <text id="diagnostics" selectable>{{result}}</text>
-  <text selectable>{{authResult}}</text>
-  <view class="note">本地域名检查已跳过。仅两个测试账号的标记数据获准写入；跨账号权限、OCR 和库存事务待验证。</view>
+  <text wx:if="{{authResult}}" class="diagnostics" user-select>{{authResult}}</text>
+  <view class="note">本地域名检查已跳过。跨账号权限、OCR 和库存事务仍待验证。</view>
+  <button bindtap="toggleLocal">{{showLocal ? '收起' : '查看'}}本地 SDK 检查</button>
+  <view wx:if="{{showLocal}}">
+    <button bindtap="runLocalDiagnostics">重新检查本地能力</button>
+    <text id="diagnostics" class="diagnostics" user-select>{{result}}</text>
+  </view>
 </view>

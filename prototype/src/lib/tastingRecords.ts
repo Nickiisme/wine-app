@@ -174,6 +174,16 @@ function fromCloud(record: CloudRecord, photoUrls: string[] = []): TastingRecord
   };
 }
 
+function isMissingRecordMetadataColumn(error: unknown) {
+  const detail = error as { message?: string; code?: string } | null;
+  return Boolean(detail && /field_metadata/i.test(detail.message ?? "") && ["42703", "PGRST204"].includes(detail.code ?? ""));
+}
+
+function withoutRecordMetadata<T extends { field_metadata?: unknown }>(payload: T) {
+  const { field_metadata: _fieldMetadata, ...legacyPayload } = payload;
+  return legacyPayload;
+}
+
 export async function resolvePhotoUrls(records: Array<{ photo_ids?: string[] | null }>) {
   const photoIds = [...new Set(records.flatMap((record) => record.photo_ids ?? []))];
   if (photoIds.length === 0) return new Map<string, string>();
@@ -330,6 +340,10 @@ export async function createTastingRecord(
     ({ data: inserted, error } = await db.from(COLLECTION).insert(legacyPayload).select("*"));
   }
 
+  if (error && isMissingRecordMetadataColumn(error)) {
+    ({ data: inserted, error } = await db.from(COLLECTION).insert(withoutRecordMetadata(payload)).select("*"));
+  }
+
   if (error) throw error;
   const persisted = (inserted?.[0] as unknown as CloudRecord) ?? payload;
   const photoUrls = await resolvePhotoUrls([persisted]).catch(() => new Map<string, string>());
@@ -342,14 +356,21 @@ export async function updateTastingRecord(record: TastingRecord): Promise<Tastin
   const userId = await ensureCloudbaseUser();
   await requireLifecycleSchema();
   const day = validateTastingDate(record.tastedOn ?? localDate());
-  const { data, error } = await getCloudbasePostgres().from(COLLECTION).update({
+  const db = getCloudbasePostgres();
+  const payload = {
     wine_name: record.wine, vintage: record.year || null, grape: record.grape, grapes: record.grapes,
     country: record.country || null, region: record.region, note: record.note,
     preference: record.preference || null, body_level: record.bodyLevel ?? null,
     flavors: (record.flavors ?? []).map(value => value.trim()).filter(Boolean), field_metadata: record.fieldMetadata,
     tasted_on: day, tasted_at: new Date(`${day}T12:00:00`).toISOString(), photo_ids: record.photoIds ?? [],
-  }).eq("id", record.id).eq("user_id", userId).is("deleted_at", null)
+  };
+  const update = (values: typeof payload | Omit<typeof payload, "field_metadata">) => db.from(COLLECTION).update(values)
+    .eq("id", record.id).eq("user_id", userId).is("deleted_at", null)
     .eq("updated_at", record.updatedAt ?? record.createdAt ?? "").select("*");
+  let { data, error } = await update(payload);
+  if (error && isMissingRecordMetadataColumn(error)) {
+    ({ data, error } = await update(withoutRecordMetadata(payload)));
+  }
   if (error) throw error;
   if (!data?.length) throw new Error("记录已被修改或删除，请刷新后再编辑");
   const row = data[0] as unknown as CloudRecord;

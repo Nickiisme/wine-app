@@ -1,11 +1,21 @@
 Page({
-  data: { result: '等待本地诊断', completed: false, loginBusy: false },
+  data: { result: '等待本地诊断', completed: false, loginBusy: false, formError: '', showLocal: false },
   onLoad() { this.runLocalDiagnostics(); },
+  toggleLocal() { this.setData({ showLocal: !this.data.showLocal }); },
   async submitTestLogin(event) {
     if (this.data.loginBusy) return;
-    let { email, password } = event.detail.value;
+    let { email, password } = (event.detail && event.detail.value) || {};
+    email = typeof email === 'string' ? email.trim() : '';
+    if (!email || typeof password !== 'string' || !password) {
+      this.setData({ formError: !email ? '请输入测试账号邮箱' : '请输入该账号的密码' });
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      this.setData({ formError: '请输入完整的邮箱地址' });
+      return;
+    }
     event.detail.value.password = '';
-    this.setData({ loginBusy: true });
+    this.setData({ loginBusy: true, formError: '', authResult: '' });
     try { await this.testEmailLogin(email.trim(), password); }
     finally { email = undefined; password = undefined; this.setData({ loginBusy: false }); }
   },
