@@ -18,6 +18,43 @@ export const EXTRA_COUNTRIES = [
   { country: "格鲁吉亚", x: 63, y: 202, zoom: 2.2 }, { country: "日本", x: 85, y: 208, zoom: 2.2 },
   { country: "乌拉圭", x: 34, y: 285, zoom: 2.2 },
 ];
+// Geographic country centers used only after zooming. Level 1 keeps its legacy
+// illustrated-map anchors above unchanged.
+export const WORLD_COUNTRY_CENTERS: Record<string, { latitude: number; longitude: number }> = {
+  法国: { latitude: 46.23, longitude: 2.21 }, 意大利: { latitude: 41.87, longitude: 12.57 },
+  中国: { latitude: 35.86, longitude: 104.2 }, 美国: { latitude: 39.83, longitude: -98.58 },
+  澳大利亚: { latitude: -25.27, longitude: 133.78 }, 新西兰: { latitude: -40.9, longitude: 174.89 },
+  西班牙: { latitude: 40.46, longitude: -3.75 }, 德国: { latitude: 51.17, longitude: 10.45 },
+  葡萄牙: { latitude: 39.4, longitude: -8.22 }, 智利: { latitude: -35.68, longitude: -71.54 },
+  阿根廷: { latitude: -38.42, longitude: -63.62 }, 南非: { latitude: -30.56, longitude: 22.94 },
+  奥地利: { latitude: 47.52, longitude: 14.55 }, 匈牙利: { latitude: 47.16, longitude: 19.5 },
+  希腊: { latitude: 39.07, longitude: 21.82 }, 加拿大: { latitude: 56.13, longitude: -106.35 },
+  格鲁吉亚: { latitude: 42.32, longitude: 43.36 }, 日本: { latitude: 36.2, longitude: 138.25 },
+  乌拉圭: { latitude: -32.52, longitude: -55.77 },
+};
+export type WorldMapView = { scale: number; x: number; y: number };
+export function getWorldMapLayout(surface: { width: number; height: number }) {
+  const left = 10;
+  const top = 116;
+  const width = Math.max(0, surface.width - left * 2);
+  const height = width / 2;
+  return { left, top, width, height, originX: surface.width / 2, originY: top + height / 2 };
+}
+export function projectWorldCountryCenter(
+  center: { latitude: number; longitude: number },
+  surface: { width: number; height: number },
+  view: WorldMapView,
+) {
+  // Keep these values in sync with `.world-map-art`. The artwork uses a 2:1
+  // equirectangular canvas, so country centers and the bitmap share one frame.
+  const image = getWorldMapLayout(surface);
+  const imageX = image.left + ((center.longitude + 180) / 360) * image.width;
+  const imageY = image.top + ((90 - center.latitude) / 180) * image.height;
+  return {
+    x: image.originX + (imageX - image.originX) * view.scale + view.x,
+    y: image.originY + (imageY - image.originY) * view.scale + view.y,
+  };
+}
 export const OTHER_REGION_ID = (countryCode: string) => `region-${countryCode.toLowerCase()}-other`;
 export function getCountryAreas(country: string) { return getCountryRegions(country); }
 export function resolveMapArea(country: string, value: string): WineMapArea {
@@ -57,7 +94,10 @@ export function placeMapLabels(candidates: MapLabel[], width: number, height: nu
   const occupied = [...reserved];
   const visible: PlacedLabel[] = [];
   const hidden: MapLabel[] = [];
-  const offsets = [[0, 0], [0, -36], [0, 36], [-40, 0], [40, 0], [0, -72], [0, 72]];
+  // A label may move by one bubble width to avoid a collision, but it must not
+  // drift into another country. Labels that still collide remain discoverable
+  // in the country picker instead of being shown at a misleading location.
+  const offsets = [[0, 0], [0, -34], [0, 34], [-40, 0], [40, 0]];
   for (const candidate of [...candidates].sort((a, b) => b.priority - a.priority || b.count - a.count || a.id.localeCompare(b.id))) {
     const w = Math.max(70, candidate.name.length * 12 + 36);
     let placed: PlacedLabel | undefined;

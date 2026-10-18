@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { stripTypeScriptTypes } from "node:module";
+import { registerHooks } from "node:module";
 import { test } from "node:test";
 
-const source = readFileSync(new URL("../src/lib/grapeCatalog.ts", import.meta.url), "utf8");
-const compiled = stripTypeScriptTypes(source);
-const catalog = await import(`data:text/javascript,${encodeURIComponent(compiled)}`);
+registerHooks({ resolve(specifier, context, nextResolve) {
+  return nextResolve(specifier.startsWith("./") && context.parentURL?.endsWith(".ts") ? `${specifier}.ts` : specifier, context);
+} });
+const catalog = await import("../src/lib/grapeCatalog.ts");
 const record = (grapes, fieldMetadata) => ({ grape: grapes.join("、"), grapes, fieldMetadata });
 
 test("24 core varieties are unique and grouped", () => {

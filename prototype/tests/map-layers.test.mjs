@@ -8,11 +8,23 @@ const source = readFileSync(new URL("../src/lib/mapLayers.ts", import.meta.url),
   .replace(/import \{[^;]+\} from "\.\/wineMapCatalog";/, "")
   .replace('export { WINE_MAP_AREAS, type WineMapArea } from "./wineMapCatalog";', "");
 const moduleSource = stripTypeScriptTypes(`${catalogSource}\n${source}`);
-const { aggregateMapRecords, placeMapLabels, WORLD_COUNTRIES, WINE_MAP_AREAS, MAP_ZOOM } = await import(`data:text/javascript,${encodeURIComponent(moduleSource)}`);
+const { aggregateMapRecords, placeMapLabels, projectWorldCountryCenter, WORLD_COUNTRIES, WORLD_COUNTRY_CENTERS, WINE_MAP_AREAS, MAP_ZOOM } = await import(`data:text/javascript,${encodeURIComponent(moduleSource)}`);
 
 test("world defaults retain the original six countries and coordinates", () => {
   assert.deepEqual(WORLD_COUNTRIES.map(({country,x,y}) => [country,x,y]), [["法国","48%","181px"],["意大利","54%","215px"],["中国","73%","205px"],["美国","19%","194px"],["澳大利亚","74%","270px"],["新西兰","83%","306px"]]);
   assert.ok(MAP_ZOOM.countries > 1 && MAP_ZOOM.records > MAP_ZOOM.regions);
+});
+test("zoomed countries use the map image projection and preserve geographic order", () => {
+  assert.equal(Object.keys(WORLD_COUNTRY_CENTERS).length, 19);
+  const surface = {width:349,height:560};
+  const view = {scale:2,x:0,y:0};
+  const france = projectWorldCountryCenter(WORLD_COUNTRY_CENTERS["法国"],surface,view);
+  const italy = projectWorldCountryCenter(WORLD_COUNTRY_CENTERS["意大利"],surface,view);
+  const china = projectWorldCountryCenter(WORLD_COUNTRY_CENTERS["中国"],surface,view);
+  const australia = projectWorldCountryCenter(WORLD_COUNTRY_CENTERS["澳大利亚"],surface,view);
+  assert.ok(italy.x > france.x && italy.y > france.y);
+  assert.ok(china.x > italy.x);
+  assert.ok(australia.x > china.x && australia.y > china.y);
 });
 test("non-major countries and custom recorded regions remain discoverable", () => {
   const groups = aggregateMapRecords([{id:"1",country:"格鲁吉亚",region:"格鲁吉亚 · 卡赫季"},{id:"2",country:"格鲁吉亚",region:"格鲁吉亚 · 自定义产区"},{id:"3",country:"克罗地亚",region:"克罗地亚 · 伊斯特拉"},{id:"4",country:"",region:"来源待核实"}]);
@@ -40,5 +52,6 @@ test("priority labels win collisions, every remaining label has an explicit fall
   const result = placeMapLabels(labels,320,380);
   assert.equal(result.visible[0].id,"19");
   assert.equal(result.visible.length+result.hidden.length,20);
+  result.visible.forEach((label)=>assert.ok(Math.hypot(label.x-150,label.y-160)<=40));
   result.visible.forEach((a,index)=> result.visible.slice(index+1).forEach((b)=>assert.ok(Math.abs(a.x-b.x)>=(a.width+b.width)/2+6 || Math.abs(a.y-b.y)>=(a.height+b.height)/2+6)));
 });

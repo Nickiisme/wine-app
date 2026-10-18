@@ -1,0 +1,166 @@
+.save-celebration {
+  position: absolute;
+  z-index: 88;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  padding: 72px 24px 84px;
+  overflow: hidden;
+  background: rgba(54, 36, 37, .32);
+  backdrop-filter: blur(5px) saturate(.9);
+  animation: save-celebration-in 220ms ease-out both;
+  perspective: 1100px;
+}
+
+.unlock-card {
+  position: relative;
+  width: min(100%, 338px);
+  max-height: 100%;
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 25px 24px 22px;
+  border: 1px solid rgba(255, 255, 255, .86);
+  border-radius: 28px;
+  background: #fff9ef;
+  box-shadow: 0 26px 64px rgba(54, 22, 30, .28), inset 0 1px 0 #fff;
+  color: #4b3436;
+  text-align: center;
+  transform-origin: 50% 50%;
+  backface-visibility: hidden;
+  animation: unlock-card-turn 620ms cubic-bezier(.18, .82, .22, 1.08) both;
+}
+
+.unlock-card::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border: 1px solid rgba(126, 22, 55, .12);
+  border-radius: 22px;
+  pointer-events: none;
+}
+
+.unlock-card .success-kicker {
+  position: relative;
+  display: block;
+  color: #8b2745;
+  font-size: 11px;
+  letter-spacing: 1.2px;
+}
+
+.unlock-card .success-grape {
+  display: block;
+  width: 132px;
+  height: 132px;
+  margin: 8px auto 1px;
+  border-radius: 38%;
+  object-fit: contain;
+  mix-blend-mode: multiply;
+}
+
+.unlock-card h1 {
+  position: relative;
+  margin: 4px 0 0;
+  color: #68132f;
+  font: 700 25px/1.35 Georgia, "Noto Serif SC", serif;
+}
+
+.unlock-grape-name {
+  margin: 4px 0 0;
+  color: #8a7b72;
+  font: 13px/1.45 Georgia, "Noto Serif SC", serif;
+}
+
+.special-discovery-chip {
+  display: inline-flex;
+  margin: 0 0 8px;
+  padding: 5px 10px;
+  border: 1px solid #dcc18b;
+  border-radius: 999px;
+  background: #fff4d8;
+  color: #8b642b;
+  font-size: 10px;
+}
+
+.unlock-feedback {
+  position: relative;
+  margin-top: 18px;
+  padding: 13px 14px;
+  border-radius: 16px;
+  background: #f3ebe1;
+  text-align: left;
+}
+
+.unlock-feedback.personal { background: #f4e6e9; }
+.unlock-feedback small { color: #7d765f; font-size: 10px; letter-spacing: .8px; }
+.unlock-feedback p { margin: 6px 0 0; color: #544843; font: 600 13px/1.55 Georgia, "Noto Serif SC", serif; }
+.unlock-card .primary-action { position: relative; margin-top: 18px; }
+.unlock-card .text-action { position: relative; display: block; margin: 8px auto 0; }
+
+.knowledge-toast {
+  position: absolute;
+  z-index: 86;
+  top: 70px;
+  left: 18px;
+  right: 18px;
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  box-sizing: border-box;
+  padding: 13px 15px;
+  border: 1px solid rgba(126, 22, 55, .12);
+  border-radius: 18px;
+  background: rgba(255, 250, 242, .96);
+  box-shadow: 0 13px 34px rgba(61, 35, 38, .2);
+  color: #554943;
+  backdrop-filter: blur(12px);
+  animation: knowledge-toast-life 3s ease both;
+  pointer-events: none;
+}
+
+.knowledge-toast > span {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  border-radius: 50%;
+  background: #eee0e4;
+  color: #81213f;
+  font-size: 14px;
+}
+
+.knowledge-toast div { min-width: 0; }
+.knowledge-toast strong { display: block; color: #711936; font-size: 12px; }
+.knowledge-toast p { margin: 3px 0 0; font-size: 11px; line-height: 1.55; }
+
+@keyframes save-celebration-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes unlock-card-turn {
+  0% { opacity: 0; transform: rotateY(-100deg) scale(.86); }
+  62% { opacity: 1; transform: rotateY(9deg) scale(1.015); }
+  100% { opacity: 1; transform: rotateY(0) scale(1); }
+}
+
+@keyframes knowledge-toast-life {
+  0% { opacity: 0; transform: translateY(-18px) scale(.96); }
+  10%, 82% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-8px) scale(.98); }
+}
+
+@media (max-height: 720px) {
+  .save-celebration { padding-top: 50px; padding-bottom: 68px; }
+  .unlock-card { padding-top: 21px; }
+  .unlock-card .success-grape { width: 108px; height: 108px; }
+  .unlock-card h1 { font-size: 22px; }
+  .unlock-feedback { margin-top: 13px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .save-celebration,
+  .unlock-card,
+  .knowledge-toast { animation-duration: 1ms; }
+}
