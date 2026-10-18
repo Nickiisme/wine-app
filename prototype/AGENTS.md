@@ -107,3 +107,5 @@ When any text-entry control loses focus, dismiss the simulated keyboard. If the 
 - Keep the keyboard below the home indicator/safe area layer in z-index, and above ordinary app UI while visible.
 - Keep the home indicator as the topmost safe-area layer in the z-index above everything else in the prototype.
 - After saving a tasting, return to the grape atlas before showing rewards. New badges appear first; then show the saved-grape card as a phone-scoped 3D flip overlay. Keep typical-aroma guidance out of the card and present it only after dismissal as a non-blocking three-second toast.
+- Tasting-record edit and delete actions stay hidden at rest. Reveal their right-side drawer by long press or a left swipe; a right swipe closes it. Do not render persistent edit/delete or overflow-menu buttons on record cards.
+- Editing a tasting record must reuse the existing `确认酒款 → 你的感受` flow with the record prefilled. Save by updating the same record; do not introduce a separate record-editor page or bottom sheet.
