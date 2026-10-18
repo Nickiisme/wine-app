@@ -24,10 +24,12 @@ import { getProfileBadges, getNewBadgeAward, type BadgeDefinition } from "./lib/
 import { calculateTasteProfile } from "./lib/tasteProfile";
 import { flavorGroups, bodyChoices } from "./lib/flavorTaxonomy";
 import { recommendedGrapes } from "./lib/exploration";
+import { platform } from "./platform/web";
+import { preparePhotos, type DraftPhoto, type PhotoFile } from "./platform/photos";
+import { FilePickerInput } from "./platform/FilePickerInput";
 
 type Screen = "activity" | "onboarding" | "explore" | "allGrapes" | "confirm" | "taste" | "profile" | "records" | "grapeSummary" | "regionSummary" | "flavor" | "share" | "settings" | "auth" | "cellar" | "cellarConfirm" | "cellarPurchase" | "cellarDetail" | "cellarConsume";
 type ExploreTab = "grapes" | "regions";
-type DraftPhoto = { id: string; preview: string; file: File; preparedFile: Promise<File> };
 type WineDraft = { wine: string; year: string; grapes: string[]; country: string; region: string; winery: string; photos: DraftPhoto[]; fieldMetadata: RecordFieldMetadata };
 type PickerOption = { value: string; label: string };
 const asset = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, "")}`;
@@ -92,7 +94,7 @@ const newPurchaseDraft = (): PurchaseDraft => ({ purchaseDate: todayLocal(), pur
 const ONBOARDING_SEEN_KEY = "wine-atlas:onboarding-seen";
 
 function rememberOnboarding() {
-  window.localStorage.setItem(ONBOARDING_SEEN_KEY, "true");
+  platform.storage.set(ONBOARDING_SEEN_KEY, "true");
 }
 
 function suggestNextTaste(record: TastingRecord) {
@@ -101,79 +103,10 @@ function suggestNextTaste(record: TastingRecord) {
   return next ? `记录了${first || "这一杯"}，下一次可以探索${next.chinese_name}，比较两种葡萄的风格。` : "下一次可以探索另一种葡萄，比较不同品种的风格。";
 }
 
-async function optimizePhoto(file: File) {
-  if (!file.type.startsWith("image/")) return file;
-  const objectUrl = URL.createObjectURL(file);
-  try {
-    const image = new Image();
-    image.decoding = "async";
-    await new Promise<void>((resolve, reject) => {
-      image.addEventListener("load", () => resolve(), { once: true });
-      image.addEventListener("error", () => reject(new Error("无法解析照片")), { once: true });
-      image.src = objectUrl;
-    });
-    const maxEdge = 1600;
-    const scale = Math.min(1, maxEdge / Math.max(image.naturalWidth, image.naturalHeight));
-    if (scale === 1 && file.size <= 1_000_000) return file;
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-    const context = canvas.getContext("2d", { alpha: false });
-    if (!context) return file;
-    context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82));
-    if (!blob || blob.size >= file.size) return file;
-    const baseName = file.name.replace(/\.[^.]+$/, "") || "wine-photo";
-    return new File([blob], `${baseName}.jpg`, { type: "image/jpeg", lastModified: file.lastModified });
-  } catch {
-    return file;
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
-}
-
-function preparePhotos(files: File[]) {
-  const resolvers: Array<(file: File) => void> = [];
-  const preparedFiles = files.map(() => new Promise<File>((resolve) => resolvers.push(resolve)));
-  let nextIndex = 0;
-  const workers = Array.from({ length: Math.min(3, files.length) }, async () => {
-    while (nextIndex < files.length) {
-      const index = nextIndex++;
-      resolvers[index](await optimizePhoto(files[index]));
-    }
-  });
-  void Promise.all(workers);
-  return files.map((file, index) => ({ id: crypto.randomUUID(), preview: URL.createObjectURL(file), file, preparedFile: preparedFiles[index] }));
-}
-
-function keepEditorAboveKeyboard(editor: HTMLElement) {
-  const scroll = editor.closest<HTMLElement>(".mobile-scroll");
-  if (!scroll) return;
-  const scrollBounds = scroll.getBoundingClientRect();
-  const editorBounds = editor.getBoundingClientRect();
-  const margin = 20;
-  const visibleTop = scrollBounds.top + margin;
-  const visibleBottom = scrollBounds.bottom - margin;
-  let nextScrollTop = scroll.scrollTop;
-
-  if (editorBounds.bottom > visibleBottom) {
-    nextScrollTop += editorBounds.bottom - visibleBottom;
-  } else if (editorBounds.top < visibleTop) {
-    nextScrollTop -= visibleTop - editorBounds.top;
-  }
-
-  const maxScrollTop = Math.max(0, scroll.scrollHeight - scroll.clientHeight);
-  const clamped = Math.max(0, Math.min(maxScrollTop, nextScrollTop));
-  if (Math.abs(clamped - scroll.scrollTop) > 1) {
-    scroll.scrollTo({ top: clamped, behavior: "smooth" });
-  }
-}
-
 export default function Prototype() {
   const keyboard = useKeyboard();
   useEffect(() => {
-    const firstBadge = new Image();
-    firstBadge.src = asset("assets/badges/first-glass.png");
+    platform.preloadImage(asset("assets/badges/first-glass.png"));
   }, []);
   const [screen, setScreen] = useState<Screen>("explore");
   const [dismissedExplorePrompt, setDismissedExplorePrompt] = useState<"empty" | "first" | null>(null);
@@ -230,7 +163,7 @@ export default function Prototype() {
   const tastingCellar = cellarEntries.find((entry) => entry.id === tastingCellarId) ?? null;
   const go = (next: Screen) => { keyboard.hide(); setScreen(next); };
   const openRecords = (filter: RecordFilter, origin: Screen) => { setRecordFilter(filter); setRecordsOrigin(origin); go("records"); };
-  const resetRecord = () => { setTastedOn(localDate()); setDraft((current) => { current.photos.forEach((photo) => URL.revokeObjectURL(photo.preview)); return newDraft(); }); setTastingNote(""); setLiked(null); setSelectedFlavors([]); setBodyLevel(null); setTastingCellarId(null); setLabelScanState("idle"); setLabelScanMessage(null); };
+  const resetRecord = () => { setTastedOn(localDate()); setDraft((current) => { current.photos.forEach((photo) => platform.revokePreview(photo.preview)); return newDraft(); }); setTastingNote(""); setLiked(null); setSelectedFlavors([]); setBodyLevel(null); setTastingCellarId(null); setLabelScanState("idle"); setLabelScanMessage(null); };
   const startManualRecord = () => { setInputMethod("manual"); setRecordSheet(false); resetRecord(); go(recordPurpose === "cellar" ? "cellarConfirm" : "confirm"); };
   const openCamera = () => {
     setRecordPurpose("tasting");
@@ -246,7 +179,7 @@ export default function Prototype() {
     if (!file) return;
     await processLabelPhoto(file);
   };
-  const processLabelPhoto = async (file: File) => {
+  const processLabelPhoto = async (file: PhotoFile) => {
     const photo = preparePhotos([file])[0];
     const purpose = recordPurpose;
     resetRecord();
@@ -296,24 +229,20 @@ export default function Prototype() {
   useEffect(() => {
     const timers = new Set<number>();
     const scheduleVisibilityCheck = (target: EventTarget | null, afterKeyboardTransition: boolean) => {
-      if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) return;
-      window.requestAnimationFrame(() => window.requestAnimationFrame(() => keepEditorAboveKeyboard(target)));
+      if (!platform.isTextEditor(target)) return;
+      platform.frame(() => platform.frame(() => platform.keepEditorAboveKeyboard(target)));
       if (afterKeyboardTransition) {
-        const timer = window.setTimeout(() => {
+        const timer = platform.delay(() => {
           timers.delete(timer);
-          keepEditorAboveKeyboard(target);
+          platform.keepEditorAboveKeyboard(target);
         }, 300);
         timers.add(timer);
       }
     };
-    const onFocus = (event: FocusEvent) => scheduleVisibilityCheck(event.target, true);
-    const onInput = (event: Event) => scheduleVisibilityCheck(event.target, false);
-    document.addEventListener("focusin", onFocus);
-    document.addEventListener("input", onInput);
+    const unsubscribe = platform.onEditorActivity(scheduleVisibilityCheck);
     return () => {
-      document.removeEventListener("focusin", onFocus);
-      document.removeEventListener("input", onInput);
-      timers.forEach((timer) => window.clearTimeout(timer));
+      unsubscribe();
+      timers.forEach((timer) => platform.cancelDelay(timer));
     };
   }, []);
 
@@ -326,7 +255,7 @@ export default function Prototype() {
         if (!isCurrent()) return;
         setRecords(cloudRecords);
         setRecordsLoaded(true);
-        if (cloudRecords.length === 0 && window.localStorage.getItem(ONBOARDING_SEEN_KEY) !== "true") setScreen("onboarding");
+        if (cloudRecords.length === 0 && platform.storage.get(ONBOARDING_SEEN_KEY) !== "true") setScreen("onboarding");
         setCloudMessage(null);
       })
       .catch(() => {
@@ -409,7 +338,7 @@ export default function Prototype() {
       setCellarEntries((current) => editingCellar ? current.map((item) => item.id === saved.id ? saved : item) : [saved, ...current]);
       setCellarEntryId(saved.id);
       setEditingCellarId(null);
-      draft.photos.forEach((photo) => URL.revokeObjectURL(photo.preview));
+      draft.photos.forEach((photo) => platform.revokePreview(photo.preview));
       setDraft(newDraft());
       openCellarDetail(saved.id);
     } catch (error) {
@@ -486,8 +415,8 @@ export default function Prototype() {
 
   useEffect(() => {
     if (!knowledgeToast) return;
-    const timeout = window.setTimeout(() => setKnowledgeToast(null), 3000);
-    return () => window.clearTimeout(timeout);
+    const timeout = platform.delay(() => setKnowledgeToast(null), 3000);
+    return () => platform.cancelDelay(timeout);
   }, [knowledgeToast]);
 
   const saveTasting = async () => {
@@ -531,7 +460,7 @@ export default function Prototype() {
         setCellarMovements(await listCellarMovements(tastingCellar.id).catch(() => []));
       }
       trackRecordEvent("record_save_succeeded", getRecordAnalyticsProperties(saved, inputMethod));
-      draft.photos.forEach((photo) => URL.revokeObjectURL(photo.preview));
+      draft.photos.forEach((photo) => platform.revokePreview(photo.preview));
       setTab("grapes");
       setDismissedExplorePrompt("first");
       go("explore");
@@ -567,7 +496,7 @@ export default function Prototype() {
       {screen === "explore" && <ExploreScreen tab={tab} records={records} recordsLoaded={recordsLoaded} account={account} dismissedPrompt={dismissedExplorePrompt} onDismissPrompt={setDismissedExplorePrompt} onTab={setTab} onRecord={openRecordChoices} onProfile={() => go("profile")} onAllGrapes={() => go("allGrapes")} onRegionNotes={(country, region) => openRecords({ kind: "region", country, region }, "explore")} onNotes={(grape) => openRecords({ kind: "grape", grape }, "explore")} />}
       {screen === "allGrapes" && <AllGrapesScreen records={records} onBack={() => go("explore")} onNotes={(grape) => openRecords({ kind: "grape", grape }, "allGrapes")} />}
       {screen === "confirm" && <ConfirmScreen draft={draft} scanState={labelScanState} scanMessage={labelScanMessage} onChange={setDraft} onBack={() => go("explore")} onNext={() => go("taste")} />}
-      {screen === "taste" && <TasteScreen tastedOn={tastedOn} onTastedOn={setTastedOn} liked={liked} setLiked={setLiked} selectedFlavors={selectedFlavors} toggleFlavor={(flavor) => setSelectedFlavors((current) => current.includes(flavor) ? current.filter((item) => item !== flavor) : [...current, flavor])} note={tastingNote} onNoteChange={setTastingNote} bodyLevel={bodyLevel} onBodyLevel={setBodyLevel} photos={draft.photos} existingPhotos={tastingCellar?.photos ?? []} cellarSummary={tastingCellar ? `${tastingCellar.wineName || "未命名藏酒"} · 本次 ${consumeQuantity} 瓶` : null} onCamera={() => noteCameraInput.current?.click()} onGallery={() => noteGalleryInput.current?.click()} onRemovePhoto={(id) => setDraft((current) => { const removed = current.photos.find((photo) => photo.id === id); if (removed) URL.revokeObjectURL(removed.preview); return { ...current, photos: current.photos.filter((photo) => photo.id !== id) }; })} onBack={() => go(tastingCellarId ? "cellarConsume" : "confirm")} onSave={saveTasting} canSave={recordCanBeSaved} saving={savingRecord} cloudMessage={cloudMessage} />}
+      {screen === "taste" && <TasteScreen tastedOn={tastedOn} onTastedOn={setTastedOn} liked={liked} setLiked={setLiked} selectedFlavors={selectedFlavors} toggleFlavor={(flavor) => setSelectedFlavors((current) => current.includes(flavor) ? current.filter((item) => item !== flavor) : [...current, flavor])} note={tastingNote} onNoteChange={setTastingNote} bodyLevel={bodyLevel} onBodyLevel={setBodyLevel} photos={draft.photos} existingPhotos={tastingCellar?.photos ?? []} cellarSummary={tastingCellar ? `${tastingCellar.wineName || "未命名藏酒"} · 本次 ${consumeQuantity} 瓶` : null} onCamera={() => noteCameraInput.current?.click()} onGallery={() => noteGalleryInput.current?.click()} onRemovePhoto={(id) => setDraft((current) => { const removed = current.photos.find((photo) => photo.id === id); if (removed) platform.revokePreview(removed.preview); return { ...current, photos: current.photos.filter((photo) => photo.id !== id) }; })} onBack={() => go(tastingCellarId ? "cellarConsume" : "confirm")} onSave={saveTasting} canSave={recordCanBeSaved} saving={savingRecord} cloudMessage={cloudMessage} />}
       {screen === "profile" && <ProfileScreen records={records} cellarEntries={cellarEntries} cellarLoaded={cellarLoaded} cellarError={cellarError} account={account} onExplore={() => go("explore")} onRecord={openCamera} onRecords={() => openRecords(null, "profile")} onGrapes={() => go("grapeSummary")} onRegions={() => go("regionSummary")} onCellar={() => { go("cellar"); void refreshCellar().catch(() => {}); }} onActivity={() => go("activity")} onFlavor={() => go("flavor")} onShare={() => go("share")} onSettings={() => go("settings")} />}
       {screen === "cellar" && <CellarListScreen entries={cellarEntries} loading={!cellarLoaded} error={cellarError} onBack={() => go("profile")} onAdd={openCellarChoices} onOpen={openCellarDetail} />}
       {screen === "cellarConfirm" && <CellarConfirmScreen draft={draft} onChange={setDraft} existingPhoto={editingCellar?.photos[0]} editing={Boolean(editingCellar)} onBack={() => go(editingCellar ? "cellarDetail" : "cellar")} onNext={() => { setCellarActionError(null); go("cellarPurchase"); }} onAddPhoto={() => noteGalleryInput.current?.click()} />}
@@ -591,10 +520,10 @@ export default function Prototype() {
         </div>
       </BottomSheet>
       <BottomSheet open={cellarOpenSheet} onOpenChange={setCellarOpenSheet} title="开一瓶" description="想为这次举杯留下什么？" snap={0.42}><div className="record-alternatives"><RecordOption icon={<CheckCircledIcon />} title="只标记已饮用" detail="记录日期和数量，更新库存" onClick={() => beginConsumption("mark")} /><RecordOption icon={<Pencil2Icon />} title="记录这次品鉴" detail="写下感受，并同步更新足迹" onClick={() => beginConsumption("tasting")} /></div></BottomSheet>
-      <input ref={cameraInput} hidden type="file" accept="image/*" capture="environment" onChange={useSelectedPhoto} aria-label="调用后置摄像头拍摄酒标" />
-      <input ref={galleryInput} hidden type="file" accept="image/*" onChange={useSelectedPhoto} aria-label="从相册选择酒标照片" />
-      <input ref={noteCameraInput} hidden type="file" accept="image/*" capture="environment" onChange={addNotePhotos} aria-label="继续拍摄品鉴照片" />
-      <input ref={noteGalleryInput} hidden type="file" accept="image/*" multiple onChange={addNotePhotos} aria-label="继续上传品鉴照片" />
+      <FilePickerInput ref={cameraInput} hidden accept="image/*" capture="environment" onChange={useSelectedPhoto} aria-label="调用后置摄像头拍摄酒标" />
+      <FilePickerInput ref={galleryInput} hidden accept="image/*" onChange={useSelectedPhoto} aria-label="从相册选择酒标照片" />
+      <FilePickerInput ref={noteCameraInput} hidden accept="image/*" capture="environment" onChange={addNotePhotos} aria-label="继续拍摄品鉴照片" />
+      <FilePickerInput ref={noteGalleryInput} hidden accept="image/*" multiple onChange={addNotePhotos} aria-label="继续上传品鉴照片" />
       {editingRecord && <RecordEditor key={editingRecord.id} record={editingRecord} onClose={() => setEditingRecord(null)} onSaved={saved => { setRecords(current => current.map(record => record.id === saved.id ? saved : record)); setEditingRecord(null); }} />}
       <BottomSheet open={!!deleteTarget} onOpenChange={open => { if (!open) setDeleteTarget(null); }} title="删除这条品鉴记录？" snap={0.45}>
         <p>删除后，这条品鉴记录、照片和相关徽章进度可能会同步变化，确定删除吗？</p>
@@ -636,8 +565,8 @@ function ExploreScreen({ tab, records, recordsLoaded, account, dismissedPrompt, 
     if (!(scroll instanceof HTMLElement) || !anchor) return;
     const updatePinned = () => setTabsPinned(scroll.scrollTop >= anchor.offsetTop);
     scroll.addEventListener("scroll", updatePinned, { passive: true });
-    const frame = window.requestAnimationFrame(updatePinned);
-    return () => { scroll.removeEventListener("scroll", updatePinned); window.cancelAnimationFrame(frame); };
+    const frame = platform.frame(updatePinned);
+    return () => { scroll.removeEventListener("scroll", updatePinned); platform.cancelFrame(frame); };
   }, [tab, recordsLoaded, records.length]);
   useEffect(() => {
     if (tab !== "regions") return;
@@ -692,7 +621,7 @@ function GrapeAtlas({ records, onSelect, onAll }: { records: TastingRecord[]; on
   const names = [...HOME_GRAPE_ORDER, ...coreNames.filter((name) => !HOME_GRAPE_ORDER.includes(name)), ...specialDiscoveries(records)];
   const atlasHeight = Math.max(1040, names.length * 113 + 24);
   const pathHeight = Math.max(940, atlasHeight - 100);
-  const choose = (name: string) => { setPressed(name); window.setTimeout(() => { setPressed(null); onSelect(name); }, 190); };
+  const choose = (name: string) => { setPressed(name); platform.delay(() => { setPressed(null); onSelect(name); }, 190); };
   const renderNode = (name: string, index: number) => {
     const core = CORE_GRAPES.find((grape) => grape.chinese_name === name);
     const special = SPECIAL_GRAPES.find((grape) => grape.chinese_name === name);
@@ -901,22 +830,7 @@ function PickerSearchInput({ value, onChange, placeholder }: { value: string; on
   const keyboardRef = useRef(keyboard);
   keyboardRef.current = keyboard;
 
-  useEffect(() => {
-    const viewport = window.visualViewport;
-    if (!viewport) return;
-    let expandedHeight = viewport.height;
-    let nativeKeyboardWasOpen = false;
-    const syncKeyboard = () => {
-      expandedHeight = Math.max(expandedHeight, viewport.height);
-      if (viewport.height < expandedHeight - 120) nativeKeyboardWasOpen = true;
-      else if (nativeKeyboardWasOpen && viewport.height > expandedHeight - 60) {
-        nativeKeyboardWasOpen = false;
-        keyboardRef.current.hide();
-      }
-    };
-    viewport.addEventListener("resize", syncKeyboard);
-    return () => viewport.removeEventListener("resize", syncKeyboard);
-  }, []);
+  useEffect(() => platform.onNativeKeyboardClosed(() => keyboardRef.current.hide()), []);
 
   return <KeyboardInput value={value} onChange={(event) => onChange(event.currentTarget.value)} placeholder={placeholder} aria-label={placeholder} />;
 }
@@ -934,29 +848,9 @@ function TasteScreen({ tastedOn, onTastedOn, liked, setLiked, selectedFlavors, t
   const { bottomInset } = useKeyboardInsets();
   const [saveInset, setSaveInset] = useState(0);
   useEffect(() => {
-    const updateSaveInset = () => {
-      const previewKeyboard = document.querySelector<HTMLElement>(".keyboard-dock");
-      if (previewKeyboard && window.getComputedStyle(previewKeyboard).display !== "none") {
-        setSaveInset(bottomInset);
-        return;
-      }
-      // The published app hides the preview keyboard. Follow the actual visible
-      // viewport so a stale preview-keyboard inset cannot lift the save button.
-      const app = document.querySelector<HTMLElement>(".wine-app");
-      const viewport = window.visualViewport;
-      const visibleBottom = (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight);
-      const obscured = Math.max(0, (app?.getBoundingClientRect().bottom ?? visibleBottom) - visibleBottom);
-      setSaveInset(obscured >= 80 ? Math.round(obscured) : 0);
-    };
+    const updateSaveInset = () => setSaveInset(platform.saveBarInset(bottomInset));
     updateSaveInset();
-    window.visualViewport?.addEventListener("resize", updateSaveInset);
-    window.visualViewport?.addEventListener("scroll", updateSaveInset);
-    window.addEventListener("resize", updateSaveInset);
-    return () => {
-      window.visualViewport?.removeEventListener("resize", updateSaveInset);
-      window.visualViewport?.removeEventListener("scroll", updateSaveInset);
-      window.removeEventListener("resize", updateSaveInset);
-    };
+    return platform.onSaveViewportChange(updateSaveInset);
   }, [bottomInset]);
   const [expandedFlavor, setExpandedFlavor] = useState<string | null>(null);
   const selectedBody = bodyChoices.find((choice) => choice.value === bodyLevel);
@@ -1038,11 +932,10 @@ function SuccessScreen({ record, recordCount, firstTaste, specialDiscovery, badg
 
 function ProfileScreen({ records, cellarEntries, cellarLoaded, cellarError, account, onExplore, onRecord, onRecords, onGrapes, onRegions, onCellar, onActivity, onFlavor, onShare, onSettings }: { records: TastingRecord[]; cellarEntries: CellarEntry[]; cellarLoaded: boolean; cellarError: string | null; account: WineAccount | null; onExplore: () => void; onRecord: () => void; onRecords: () => void; onGrapes: () => void; onRegions: () => void; onCellar: () => void; onActivity: () => void; onFlavor: () => void; onShare: () => void; onSettings: () => void }) {
   useEffect(() => {
-    const resetScroll = window.setTimeout(() => {
-      const scroll = document.querySelector<HTMLElement>(".mobile-scroll");
-      if (scroll) scroll.scrollTop = 0;
+    const resetScroll = platform.delay(() => {
+      platform.resetFirstScroll();
     }, 120);
-    return () => window.clearTimeout(resetScroll);
+    return () => platform.cancelDelay(resetScroll);
   }, []);
   const stats = getRecordStats(records);
   const storedBottles = cellarEntries.reduce((sum, entry) => sum + entry.quantityRemaining, 0);
@@ -1098,8 +991,8 @@ function AuthScreen({ initialMode, onBack, onAuthenticated }: { initialMode: "lo
   const switchMode = (next: "login" | "register") => { setMode(next); setStep("form"); setCode(""); resetFeedback(); };
   useEffect(() => {
     if (!message && !error) return;
-    const timer = window.setTimeout(() => document.querySelector(".auth-message")?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 280);
-    return () => window.clearTimeout(timer);
+    const timer = platform.delay(() => platform.scrollAuthMessage(), 280);
+    return () => platform.cancelDelay(timer);
   }, [message, error]);
   const submit = async () => {
     keyboard.hide();
@@ -1133,6 +1026,28 @@ function AuthScreen({ initialMode, onBack, onAuthenticated }: { initialMode: "lo
     setBusy(true);
     try { await (await getAccountApi()).sendPasswordReset(email); setMessage("重置密码邮件已发送，请前往邮箱查看"); } catch (reason) { setError(reason instanceof Error ? reason.message : "发送失败，请稍后重试"); } finally { setBusy(false); }
   };
+  useEffect(() => {
+    const input = document.querySelector<HTMLInputElement>(".auth-fields input[type='password']");
+    if (!input) return;
+    const label = input.closest("label");
+    if (!label) return;
+    label.classList.add("has-password-toggle");
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "password-toggle";
+    toggle.setAttribute("aria-label", "显示密码");
+    toggle.setAttribute("aria-pressed", "false");
+    toggle.textContent = "◉";
+    toggle.addEventListener("click", () => {
+      const visible = input.type === "text";
+      input.type = visible ? "password" : "text";
+      toggle.textContent = visible ? "◉" : "⊙";
+      toggle.setAttribute("aria-label", visible ? "显示密码" : "隐藏密码");
+      toggle.setAttribute("aria-pressed", String(!visible));
+    });
+    label.append(toggle);
+    return () => { toggle.remove(); label.classList.remove("has-password-toggle"); };
+  }, [mode, loginMethod, step]);
   return <MobileScroll className="app-scroll paper-screen"><main className="flow-content auth-content"><FlowHeader title="账号" onBack={onBack} /><div className="auth-heading"><span>🍷</span><h1>{step === "verify" ? "查收你的邮箱" : "保存每一次举杯"}</h1><p>{step === "verify" ? "输入邮件中的验证码，完成身份验证" : "登录后，你的品鉴记录、徽章和风味偏好会安全同步"}</p></div>{step === "form" ? <><div className="auth-tabs" role="tablist"><button className={mode === "login" ? "active" : ""} onClick={() => switchMode("login")}>登录</button><button className={mode === "register" ? "active" : ""} onClick={() => switchMode("register")}>注册</button></div>{mode === "login" && <div className="login-method"><button className={loginMethod === "password" ? "active" : ""} onClick={() => { setLoginMethod("password"); resetFeedback(); }}>密码登录</button><button className={loginMethod === "otp" ? "active" : ""} onClick={() => { setLoginMethod("otp"); resetFeedback(); }}>验证码登录</button></div>}<div className="auth-fields">{mode === "register" && <label><span>昵称</span><KeyboardInput value={nickname} minLength={2} maxLength={48} onChange={(event) => setNickname(event.currentTarget.value)} placeholder="2–48 个字符" autoComplete="nickname" /></label>}<label><span>邮箱</span><KeyboardInput type="email" value={email} onChange={(event) => setEmail(event.currentTarget.value)} placeholder="name@example.com" autoComplete="email" /></label>{(mode === "register" || loginMethod === "password") && <label><span>密码</span><KeyboardInput type="password" value={password} maxLength={32} onChange={(event) => setPassword(event.currentTarget.value)} placeholder="至少 8 位，包含字母和数字" autoComplete={mode === "register" ? "new-password" : "current-password"} /></label>}</div>{mode === "login" && loginMethod === "password" && <button className="forgot-link" onClick={() => void resetPassword()}>忘记密码？</button>}<button className="account-primary" onClick={() => void submit()} disabled={busy}>{busy ? "请稍候…" : mode === "register" ? "发送验证码并注册" : loginMethod === "otp" ? "发送登录验证码" : "登录"}</button></> : <><div className="verify-code"><KeyboardInput inputMode="numeric" value={code} maxLength={8} onChange={(event) => setCode(event.currentTarget.value.replace(/\D/g, ""))} placeholder="输入验证码" aria-label="邮箱验证码" /></div><button className="account-primary" onClick={() => void verify()} disabled={busy}>{busy ? "正在验证…" : mode === "register" ? "完成注册" : "完成登录"}</button><button className="auth-back-link" onClick={() => { setStep("form"); setCode(""); resetFeedback(); }}>返回修改邮箱</button></>}{message && <p className="auth-message success" role="status">{message}</p>}{error && <p className="auth-message error" role="alert">{error}</p>}<p className="auth-terms">继续即表示你同意用户协议与隐私政策。账号认证由 CloudBase 安全处理。</p></main></MobileScroll>;
 }
 
@@ -1153,11 +1068,10 @@ function ShareAtlasScreen({ records, account, onBack }: { records: TastingRecord
   const share = async () => {
     const text = `${displayName} 的葡萄酒图鉴：已点亮 ${stats.grapeCount} 个品种、${stats.regionCount} 个产区，完成 ${stats.recordCount} 次品鉴。`;
     try {
-      if (navigator.share) await navigator.share({ title: "我的葡萄酒图鉴", text, url: window.location.href });
-      else await navigator.clipboard.writeText(`${text} ${window.location.href}`);
+      await platform.share("我的葡萄酒图鉴", text);
       setShared(true);
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
+      if (platform.isShareCancelled(error)) return;
     }
   };
   return <MobileScroll className="app-scroll paper-screen"><main className="flow-content share-content"><FlowHeader title="分享我的图鉴" onBack={onBack} /><section className="share-card"><small>{displayName} 的葡萄酒世界</small><h2>每一杯，都让图鉴更完整</h2><p><strong>{stats.grapeCount}</strong> 个品种 · <strong>{stats.regionCount}</strong> 个产区 · <strong>{stats.recordCount}</strong> 次品鉴</p>{photos.length > 0 ? <div className="share-photo-grid">{photos.map((photo, index) => <img key={`${photo}-${index}`} src={photo} alt={`我的品鉴照片 ${index + 1}`} draggable={false} />)}</div> : <div className="share-empty"><CameraIcon /><span>记录并保存照片后，会自动出现在这里</span></div>}<footer>我的葡萄酒图鉴 · 初心版</footer></section><button className="primary-action" onClick={() => void share()}>{shared ? "已准备好分享" : "分享给朋友"}</button><p className="share-tip">分享卡片只展示你真实保存过的照片，缩略图统一为 1:1。</p></main></MobileScroll>;
