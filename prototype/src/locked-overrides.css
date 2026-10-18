@@ -906,8 +906,15 @@
    may resize the browser, but must not leave a detached sheet above it. */
 .bottom-sheet:has(.picker-search) { top: 64px; bottom: 0 !important; max-height: none !important; min-height: 0; }
 .bottom-sheet:has(.picker-search) .sheet-content { display: flex; flex: 1; flex-direction: column; min-height: 0; overflow: hidden; }
-.option-picker:has(.picker-search) { flex: 1; padding-bottom: calc(18px + var(--picker-keyboard-height, 0px)); }
+.option-picker:has(.picker-search) { flex: 1; padding-bottom: 18px; }
 .option-picker:has(.picker-search) .picker-options { flex: 1; max-height: none; }
+
+/* Keep the picker anchored while the native keyboard is open. The search
+   field should stay in place; only the options list needs to scroll. */
+.bottom-sheet:has(.option-picker .picker-search input:focus) {
+  height: min(62%, 520px) !important;
+  max-height: min(62%, 520px) !important;
+}
 
 .bottom-sheet { box-sizing: border-box; max-width: 100%; }
 .bottom-sheet .sheet-content { min-width: 0; overflow-x: hidden; }
