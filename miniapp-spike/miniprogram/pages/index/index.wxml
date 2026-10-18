@@ -3,5 +3,6 @@
   <view>仅检查 AppID 和官方 SDK 加载，不发起业务登录或云端请求。</view>
   <button bindtap="runLocalDiagnostics">重新检查本地能力</button>
   <text id="diagnostics" selectable>{{result}}</text>
+  <text selectable>{{authResult}}</text>
   <view class="note">UID、RLS、照片、OCR、库存事务仍需独立测试环境验证。</view>
 </view>

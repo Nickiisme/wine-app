@@ -1,3 +1,4 @@
+import { platform } from "../platform/web";
 import type { RecordMode } from "./tastingRecords";
 
 export type RecordAnalyticsEvent = "record_save_clicked" | "record_save_succeeded" | "record_feedback_viewed";
@@ -16,7 +17,5 @@ export type RecordAnalyticsProperties = {
 
 export function trackRecordEvent(event: RecordAnalyticsEvent, properties: RecordAnalyticsProperties) {
   // Deliberately excludes note text, photos, labels, and all other personal content.
-  window.dispatchEvent(new CustomEvent("wine-app:analytics", { detail: { event, properties } }));
-  const analyticsWindow = window as typeof window & { dataLayer?: Array<Record<string, unknown>> };
-  analyticsWindow.dataLayer?.push({ event, ...properties });
+  platform.emitAnalytics(event, properties);
 }

@@ -4,7 +4,7 @@ import { test } from "node:test";
 
 // Node's built-in type stripping needs explicit extensions for source imports.
 registerHooks({ resolve(specifier, context, nextResolve) {
-  return nextResolve(specifier.startsWith("./") && context.parentURL?.endsWith(".ts") ? `${specifier}.ts` : specifier, context);
+  return nextResolve(specifier.startsWith(".") && context.parentURL?.endsWith(".ts") ? `${specifier}.ts` : specifier, context);
 } });
 
 const { getProfileBadges, getNewBadgeAward } = await import("../src/lib/badges.ts");

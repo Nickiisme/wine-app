@@ -3,6 +3,7 @@ import { ArrowLeftIcon, CameraIcon, ChevronRightIcon, PlusIcon } from "@radix-ui
 import { KeyboardInput, KeyboardTextarea, MobileScroll, useKeyboardInsets } from "./mobile";
 import type { CellarEntry, CellarMovement } from "./lib/cellar";
 import "./cellar.css";
+import { platform } from "./platform/web";
 
 export type PurchaseDraft = {
   purchaseDate: string;
@@ -36,24 +37,9 @@ export function CellarPurchaseScreen({ wineName, photo, draft, onChange, onBack,
   const { bottomInset } = useKeyboardInsets();
   const [saveInset, setSaveInset] = useState(0);
   useEffect(() => {
-    const updateInset = () => {
-      const previewKeyboard = document.querySelector<HTMLElement>(".keyboard-dock");
-      if (previewKeyboard && getComputedStyle(previewKeyboard).display !== "none") { setSaveInset(bottomInset); return; }
-      const app = document.querySelector<HTMLElement>(".wine-app");
-      const viewport = window.visualViewport;
-      const visibleBottom = (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight);
-      const obscured = Math.max(0, (app?.getBoundingClientRect().bottom ?? visibleBottom) - visibleBottom);
-      setSaveInset(obscured >= 80 ? Math.round(obscured) : 0);
-    };
+    const updateInset = () => setSaveInset(platform.saveBarInset(bottomInset));
     updateInset();
-    window.visualViewport?.addEventListener("resize", updateInset);
-    window.visualViewport?.addEventListener("scroll", updateInset);
-    window.addEventListener("resize", updateInset);
-    return () => {
-      window.visualViewport?.removeEventListener("resize", updateInset);
-      window.visualViewport?.removeEventListener("scroll", updateInset);
-      window.removeEventListener("resize", updateInset);
-    };
+    return platform.onSaveViewportChange(updateInset);
   }, [bottomInset]);
   const set = (changes: Partial<PurchaseDraft>) => onChange({ ...draft, ...changes });
   return <><CellarHeader title="记录购买信息" onBack={onBack} /><MobileScroll className="app-scroll paper-screen"><main className="flow-content record-flow-content cellar-page cellar-form-page cellar-purchase-page">

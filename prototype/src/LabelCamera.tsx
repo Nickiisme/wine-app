@@ -1,56 +1,54 @@
 import { useEffect, useRef, useState } from "react";
 import "./record-interactions.css";
+import { platform } from "./platform/web";
+import { requestCamera, attachCamera, stopCamera, captureCamera, cameraErrorMessage } from "./platform/camera";
+import type { PhotoFile } from "./platform/photos";
 
-export function LabelCamera({ onCapture, onSystemCamera }: { onCapture: (file: File) => void; onSystemCamera: () => void }) {
+export function LabelCamera({ onCapture, onSystemCamera }: { onCapture: (file: PhotoFile) => void; onSystemCamera: () => void }) {
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
   const generation = useRef(0);
   const alive = useRef(true);
   const [status, setStatus] = useState<'idle' | 'starting' | 'live' | 'captured' | 'error'>('idle');
   const [message, setMessage] = useState('');
-  const [shot, setShot] = useState<{ file: File; url: string } | null>(null);
+  const [shot, setShot] = useState<{ file: PhotoFile; url: string } | null>(null);
   const shotUrl = useRef<string | null>(null);
-  const stop = () => { generation.current++; stream.current?.getTracks().forEach(track => track.stop()); stream.current = null; if (video.current) video.current.srcObject = null; };
+  const stop = () => { generation.current++; stopCamera(stream.current, video.current); stream.current = null; };
   useEffect(() => {
     alive.current = true;
-    const hide = () => { if (document.hidden) { stop(); setStatus('idle'); } };
-    document.addEventListener('visibilitychange', hide);
-    return () => { alive.current = false; stop(); if (shotUrl.current) URL.revokeObjectURL(shotUrl.current); document.removeEventListener('visibilitychange', hide); };
+    const unsubscribe = platform.onPageHidden(() => { stop(); setStatus('idle'); });
+    return () => { alive.current = false; stop(); if (shotUrl.current) platform.revokePreview(shotUrl.current); unsubscribe(); };
   }, []);
   const start = async () => {
     stop();
     const request = generation.current;
-    if (shotUrl.current) URL.revokeObjectURL(shotUrl.current);
+    if (shotUrl.current) platform.revokePreview(shotUrl.current);
     shotUrl.current = null; setShot(null); setStatus('starting'); setMessage('');
     try {
-      if (!navigator.mediaDevices?.getUserMedia) throw new Error('当前浏览器不支持内嵌相机，请使用系统相机或相册。');
-      const media = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1440 } } });
-      if (!alive.current || request !== generation.current) { media.getTracks().forEach(track => track.stop()); return; }
+      const media = await requestCamera();
+      if (!alive.current || request !== generation.current) { stopCamera(media, null); return; }
       stream.current = media;
       if (!video.current) { stop(); return; }
-      video.current.srcObject = media;
-      await video.current.play();
+      await attachCamera(video.current, media);
       if (alive.current && request === generation.current) setStatus('live');
     } catch (error) {
       if (!alive.current || request !== generation.current) return;
       stop(); setStatus('error');
-      setMessage(error instanceof DOMException && error.name === 'NotAllowedError' ? '未获得相机权限。可以在浏览器设置中允许，或使用系统相机、相册。' : error instanceof Error ? error.message : '相机暂不可用，请使用系统相机或相册。');
+      setMessage(cameraErrorMessage(error));
     }
   };
-  const capture = () => {
+  const capture = async () => {
     const source = video.current;
-    if (status !== 'live' || !source?.videoWidth || !source.videoHeight) return;
-    const canvas = document.createElement('canvas');
-    canvas.width = source.videoWidth; canvas.height = source.videoHeight;
-    canvas.getContext('2d')?.drawImage(source, 0, 0);
+    if (status !== 'live' || !source) return;
     const request = generation.current;
     setStatus('captured');
-    canvas.toBlob(blob => {
-      if (!alive.current || request !== generation.current) return;
-      if (!blob) { setStatus('live'); return; }
-      const file = new File([blob], `wine-label-${Date.now()}.jpg`, { type: 'image/jpeg' });
-      const url = URL.createObjectURL(blob); shotUrl.current = url; setShot({ file, url }); stop();
-    }, 'image/jpeg', 0.92);
+    const result = await captureCamera(source);
+    if (!alive.current || request !== generation.current) {
+      if (result) platform.revokePreview(result.url);
+      return;
+    }
+    if (!result) { setStatus('live'); return; }
+    shotUrl.current = result.url; setShot(result); stop();
   };
   return <div className="inline-label-camera">
     <div className="label-camera-stage">

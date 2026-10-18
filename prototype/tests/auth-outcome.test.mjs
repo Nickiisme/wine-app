@@ -8,7 +8,7 @@ let fixtureId = 0;
 async function loadAuth(options = {}) {
   const fixture = `
     const options = ${JSON.stringify(options)};
-    const window = { setTimeout: (fn) => globalThis.setTimeout(fn, 5), clearTimeout: globalThis.clearTimeout };
+    const platform = { delay: (fn) => globalThis.setTimeout(fn, 5), cancelDelay: globalThis.clearTimeout, currentUrl: () => "https://wine.example.test/" };
     const user = { id: "signed-in-user", email: "wine@example.test", is_anonymous: false };
     const verified = async () => ({ data: { user }, error: null });
     const cloudbase = { init: () => ({
@@ -25,7 +25,7 @@ async function loadAuth(options = {}) {
       } }) }),
     }) };
   `;
-  const code = stripTypeScriptTypes(source.replace('import cloudbase from "@cloudbase/js-sdk";', fixture).replace("import.meta.env.VITE_CLOUDBASE_ENV_ID", "undefined"));
+  const code = stripTypeScriptTypes(source.replace('import { platform } from "../platform/web";', "").replace('import cloudbase from "@cloudbase/js-sdk";', fixture).replace("import.meta.env.VITE_CLOUDBASE_ENV_ID", "undefined"));
   return import(`data:text/javascript,${encodeURIComponent(code)}#${fixtureId++}`);
 }
 

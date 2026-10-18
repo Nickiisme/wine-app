@@ -4,6 +4,24 @@
 
 ## 结论与证据边界
 
+## 2026-10-18 补充：现有环境邮箱登录尝试
+
+用户提供了一个测试账号，授权用于验证。凭据未写入项目文件或本报告。本轮未注册用户、未写 profiles、未上传、未调用 OCR、未执行写入 SQL/RPC；尚未取得第二个账号或测试数据写入范围授权。
+
+| 项目 | 状态 | 证据 |
+|---|---|---|
+| E1：现有邮箱账号在小程序模拟器中登录 | FAIL | 官方 SDK 3.10.2 `app.auth().signInWithPassword` 实际返回错误；两次受控执行均未得到 UID，首次摘要 `code:unknown`，补充脱敏 message 后为 `code:unknown,message:No message` |
+| E2：登录后只读本人 tasting_records | BLOCKED | 登录未成功，查询没有执行，`ownRead:NOT_RUN` |
+
+入口：`miniapp-spike/miniprogram/pages/index/index.js:testEmailLogin`，环境 `wine-app-d6grgbodge1334980`，请求方式为小程序版官方 SDK 邮箱密码登录（不是微信登录）。通过 `automation_evaluate` 从 `getCurrentPages()` 取得当前页执行，工具返回 `ok:true,result.success:true`，业务结果 `login:ERROR,phase:signInWithPassword`。工具成功只表示诊断函数执行成功。未取得服务端 requestId、HTTP 状态或有效 UID；未知错误不足以断定密码错误、域名错误或 SDK 不兼容。
+
+`automation_page_action callMethod` 曾返回 `No context found for objectId 1`；随后受控 evaluate 验证方法存在且 `authResult:null`，改用 evaluate 才取得上述业务结果。CLI 的 `--args` 被拒绝，使用内存管道传入 `--args-file`，未创建凭据文件。console 对 `domain` / `合法` 的筛选均为空，不能据此排除网络配置问题。
+
+独立补充矩阵：PASS 0 / FAIL 1 / BLOCKED 1。原 37 项主矩阵仍为 PASS 0 / FAIL 0 / BLOCKED 29 / INFERRED 8（原矩阵要求微信身份及隔离环境，不将邮箱登录尝试冒充微信登录测试）。总体仍为 Conditional Go，仅继续验证。
+
+现有 Web 的 `acceptAccount → syncProfile` 会 upsert profiles，本轮绕开该封装以保留生产业务数据不变。诊断项目启动仍仅运行本地检查；显式调用 testEmailLogin 才会发起登录，成功后最多只读本人一条记录 ID，不输出记录、UID 或令牌。页面本地检查的零请求字段只对应启动检查，不代表显式登录后的累计请求数。
+
+
 2026-10-18 再次实测更新：`cloud_env_list --appid wx5c33b5cc2b34a20a` 仍返回 `ok:true,list:[]`；随后按用户已明确提供的原环境执行 `cloud_fn_list --appid wx5c33b5cc2b34a20a --env wine-app-d6grgbodge1334980`，真实返回 `ok:true,result:{appid:"wx5c33b5cc2b34a20a",total:1,list:["recognizeWineLabel"]}`。这证明当前已授权开发者工具的管理查询能读取原环境的云函数列表，空环境列表不再作为“原环境完全不可访问”的依据。环境枚举差异原因尚未确认，不猜测为缓存或必需导入。没有调用 OCR，因此 D1–D4 仍 BLOCKED；该管理查询也不验证终端 UID、RLS、RPC 或私有照片权限。
 
 最新进展（2026-10-18）：用户提供 `wine-app` 环境“小程序认证”页面截图，目标 AppID `wx5c33b5cc2b34a20a` 显示“授权成功”，页面更新时间为 `2026-10-18 02:51:36`。此前管理授权失败已取得后续成功截图证据，不再把旧报错视为最新状态；不推断具体解绑/换绑过程或账号注销撤回状态。随后 agent 真实执行 `wechatide -c Codex cloud_env_list --appid wx5c33b5cc2b34a20a`，返回 `ok:true,result:{appid:"wx5c33b5cc2b34a20a",list:[]}`。因此控制台小程序授权成功与 IDE 可见云环境是两个不同检查，后者目前尚未列出原环境。空列表不能证明环境被删除；需要核实工具会话刷新、已有环境导入及该 PG 环境对当前接入方式的支持。没有部署、调用业务函数或写库。

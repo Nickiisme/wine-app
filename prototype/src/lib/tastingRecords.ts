@@ -1,3 +1,5 @@
+import { platform } from "../platform/web";
+import type { PhotoFile } from "../platform/photos";
 import { recordGrapeNames } from "./grapeCatalog";
 import { localDate, validateTastingDate } from "./tastingDates";
 
@@ -108,7 +110,7 @@ export function canSaveRecord(input: { wine: string; grapes: string[]; country: 
 
 export type NewTastingRecord = Omit<TastingRecord, "id" | "date"> & {
   tastedAt?: Date;
-  photoFiles?: File[];
+  photoFiles?: PhotoFile[];
   existingPhotoIds?: string[];
   cellarQuantity?: number;
 };
@@ -203,13 +205,13 @@ export async function resolvePhotoUrls(records: Array<{ photo_ids?: string[] | n
   return urls;
 }
 
-function fileExtension(file: File) {
+function fileExtension(file: PhotoFile) {
   const fromName = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "");
   if (fromName && fromName.length <= 5) return fromName;
   return file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
 }
 
-export async function uploadRecordPhotos(files: File[], userId: string, recordId: string) {
+export async function uploadRecordPhotos(files: PhotoFile[], userId: string, recordId: string) {
   if (files.length === 0) return [];
   const { cloudbaseApp } = await getCloudbase();
   const bucket = cloudbaseApp.storage.from(PHOTO_BUCKET);
@@ -275,7 +277,7 @@ export async function createTastingRecord(
   await requireLifecycleSchema();
   const tastedAt = new Date(`${tastedOn}T12:00:00`).toISOString();
   const createdAt = new Date().toISOString();
-  const id = crypto.randomUUID();
+  const id = platform.id();
   const db = getCloudbasePostgres();
 
   const { error: profileError } = await db.from("profiles").upsert(

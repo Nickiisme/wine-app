@@ -1,3 +1,5 @@
+import { platform } from "../platform/web";
+import type { PhotoFile } from "../platform/photos";
 export type WineLabelRecognition = {
   rawText: string[];
   wine: string;
@@ -12,27 +14,10 @@ type WineLabelFunctionResult =
   | ({ ok: true } & WineLabelRecognition)
   | { ok: false; error?: { code?: string; message?: string } };
 
-function fileToBase64(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener("load", () => {
-      const result = String(reader.result || "");
-      const separator = result.indexOf(",");
-      if (separator < 0) {
-        reject(new Error("无法读取酒标照片"));
-        return;
-      }
-      resolve(result.slice(separator + 1));
-    }, { once: true });
-    reader.addEventListener("error", () => reject(new Error("无法读取酒标照片")), { once: true });
-    reader.readAsDataURL(file);
-  });
-}
-
-export async function recognizeWineLabel(file: File): Promise<WineLabelRecognition> {
+export async function recognizeWineLabel(file: PhotoFile): Promise<WineLabelRecognition> {
   const { cloudbaseApp, ensureCloudbaseUser } = await import("./cloudbase");
   await ensureCloudbaseUser();
-  const imageBase64 = await fileToBase64(file);
+  const imageBase64 = await platform.readBase64(file);
   const response = await cloudbaseApp.callFunction({
     name: "recognizeWineLabel",
     data: { imageBase64 },

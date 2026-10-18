@@ -1,3 +1,4 @@
+import { platform } from "../platform/web";
 import cloudbase from "@cloudbase/js-sdk";
 
 export const CLOUDBASE_ENV_ID =
@@ -50,10 +51,10 @@ async function withAuthTimeout<T>(request: Promise<T>, message: string, timeoutM
   try {
     return await Promise.race([
       request,
-      new Promise<T>((_, reject) => { timer = window.setTimeout(() => reject(new Error(message)), timeoutMs); }),
+      new Promise<T>((_, reject) => { timer = platform.delay(() => reject(new Error(message)), timeoutMs); }),
     ]);
   } finally {
-    window.clearTimeout(timer);
+    platform.cancelDelay(timer);
   }
 }
 
@@ -128,7 +129,7 @@ export async function beginEmailOtpLogin(email: string): Promise<VerifyEmailCode
 }
 
 export async function sendPasswordReset(email: string) {
-  const result = await withAuthTimeout(auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.href }), "重置邮件发送超时，请稍后重试");
+  const result = await withAuthTimeout(auth.resetPasswordForEmail(email.trim(), { redirectTo: platform.currentUrl() }), "重置邮件发送超时，请稍后重试");
   if (result.error) throw authError(result.error, "重置邮件发送失败");
 }
 

@@ -3,7 +3,7 @@ import { registerHooks } from "node:module";
 import { test } from "node:test";
 
 registerHooks({ resolve(specifier, context, nextResolve) {
-  return nextResolve(specifier.startsWith("./") && context.parentURL?.endsWith(".ts") ? `${specifier}.ts` : specifier, context);
+  return nextResolve(specifier.startsWith(".") && context.parentURL?.endsWith(".ts") ? `${specifier}.ts` : specifier, context);
 } });
 const catalog = await import("../src/lib/grapeCatalog.ts");
 const record = (grapes, fieldMetadata) => ({ grape: grapes.join("、"), grapes, fieldMetadata });

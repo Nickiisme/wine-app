@@ -1,3 +1,5 @@
+import { platform } from "../platform/web";
+import type { PhotoFile } from "../platform/photos";
 import { resolvePhotoUrls, uploadRecordPhotos } from "./tastingRecords";
 
 async function cloud() { return import("./cloudbase"); }
@@ -38,7 +40,7 @@ export type CellarMovement = {
 export type CellarInput = Pick<CellarEntry,
   "wineName" | "vintage" | "grapes" | "country" | "region" | "winery" |
   "purchaseDate" | "purchasePrice" | "currency" | "quantityPurchased" |
-  "purchaseChannel" | "storageLocation" | "notes"> & { photoFiles?: File[] };
+  "purchaseChannel" | "storageLocation" | "notes"> & { photoFiles?: PhotoFile[] };
 
 type CloudEntry = {
   id: string; user_id: string; wine_name: string; vintage: string | null; grape: string[] | null;
@@ -98,7 +100,7 @@ export async function createCellarEntry(input: CellarInput): Promise<CellarEntry
   const { ensureCloudbaseUser, getCloudbasePostgres } = await cloud();
   const userId = await ensureCloudbaseUser();
   const db = getCloudbasePostgres();
-  const id = crypto.randomUUID();
+  const id = platform.id();
   const now = new Date().toISOString();
   const photoIds = await uploadRecordPhotos(input.photoFiles ?? [], userId, id);
   const row: CloudEntry = {
@@ -122,7 +124,7 @@ export async function updateCellarEntry(entry: CellarEntry, input: CellarInput):
   const { ensureCloudbaseUser, getCloudbasePostgres } = await cloud();
   const userId = await ensureCloudbaseUser();
   const db = getCloudbasePostgres();
-  const newPhotos = await uploadRecordPhotos(input.photoFiles ?? [], userId, crypto.randomUUID());
+  const newPhotos = await uploadRecordPhotos(input.photoFiles ?? [], userId, platform.id());
   const changes = {
     wine_name: input.wineName.trim(), vintage: input.vintage || null,
     grape: input.grapes.length ? input.grapes : null, country: input.country || null,
