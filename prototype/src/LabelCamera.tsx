@@ -10,15 +10,18 @@ export function LabelCamera({ onCapture, onSystemCamera, onClose, onGallery, onM
   const stream = useRef<MediaStream | null>(null);
   const generation = useRef(0);
   const alive = useRef(true);
-  const [status, setStatus] = useState<'idle' | 'starting' | 'live' | 'captured' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'starting' | 'live' | 'captured' | 'error'>('starting');
   const [message, setMessage] = useState('');
   const [shot, setShot] = useState<{ file: PhotoFile; url: string } | null>(null);
   const shotUrl = useRef<string | null>(null);
   const stop = () => { generation.current++; stopCamera(stream.current, video.current); stream.current = null; };
   useEffect(() => {
     alive.current = true;
+    let cancelled = false;
+    // Skip a discarded StrictMode mount; only the active capture surface requests permission.
+    queueMicrotask(() => { if (!cancelled) void start(); });
     const unsubscribe = platform.onPageHidden(() => { stop(); setStatus('idle'); });
-    return () => { alive.current = false; stop(); if (shotUrl.current) platform.revokePreview(shotUrl.current); unsubscribe(); };
+    return () => { cancelled = true; alive.current = false; stop(); if (shotUrl.current) platform.revokePreview(shotUrl.current); unsubscribe(); };
   }, []);
   const start = async () => {
     stop();

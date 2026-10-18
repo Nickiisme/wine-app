@@ -3,7 +3,7 @@
 - Source visual truth: `/var/folders/97/_xk916z5461gmldt5xzpfsg00000gn/T/codex-clipboard-b6b91b96-70ff-4026-8c6f-366b917dfeef.png` (864 × 1821).
 - Implementation screenshot: `camera-layout-preview.png` (393 × 720 CSS/pixel crop, no device chrome; browser viewport 1280 × 720).
 - Implementation: http://127.0.0.1:4175/ in Codex in-app browser.
-- State: camera not activated. Reference shows live video; implementation intentionally preserves the existing explicit camera-permission/start action and uses no fake bottle photograph.
+- Captured state: camera not activated. Reference shows live video; no fake bottle photograph is used. Follow-up change: opening capture now automatically requests camera permission and starts video after approval. The saved screenshot predates this behavior change; fresh real-camera evidence remains pending.
 
 ## Comparison and checks
 
