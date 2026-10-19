@@ -102,8 +102,8 @@
 .taste-flavor-detail-heading strong { color: #14213b; font-size: 13px; }
 .taste-flavor-detail-heading span { color: #8b8585; font-size: 10px; text-align: right; }
 .taste-flavor-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
-.taste-flavor-options button { display: grid; justify-items: center; align-content: center; gap: 4px; min-width: 0; min-height: 62px; padding: 6px 3px; border: 1px solid #ddd5cc; border-radius: 11px; background: #fff; color: #514d54; font-size: 11px; }
-.taste-flavor-option-icon { display: block; font-size: 22px; line-height: 1.1; }
+.taste-flavor-options button { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; min-height: 43px; padding: 4px 3px; border: 1px solid #ddd5cc; border-radius: 13px; background: #fff; color: #514d54; font-size: 12px; }
+.taste-flavor-option-icon { flex: none; width: 20px; font-size: 20px; line-height: 1; text-align: center; }
 .taste-flavor-options button.selected { border-color: #8d2343; background: #f2dfe5; color: #69132f; font-weight: 700; }
 .taste-content .note-heading { margin-bottom: 10px; }
 .taste-note-field { position: relative; }
