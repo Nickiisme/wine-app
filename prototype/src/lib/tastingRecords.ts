@@ -179,6 +179,15 @@ function isMissingRecordMetadataColumn(error: unknown) {
   return Boolean(detail && /field_metadata/i.test(detail.message ?? "") && ["42703", "PGRST204"].includes(detail.code ?? ""));
 }
 
+function missingOptionalRecordColumn(error: unknown): "field_metadata" | "grapes" | null {
+  const detail = error as { message?: string; code?: string } | null;
+  const message = detail?.message ?? "";
+  if (!/column|schema cache/i.test(message) && !["42703", "PGRST204"].includes(detail?.code ?? "")) return null;
+  if (/field_metadata/i.test(message)) return "field_metadata";
+  if (/\bgrapes\b/i.test(message)) return "grapes";
+  return null;
+}
+
 function withoutRecordMetadata<T extends { field_metadata?: unknown }>(payload: T) {
   const { field_metadata: _fieldMetadata, ...legacyPayload } = payload;
   return legacyPayload;
@@ -364,12 +373,18 @@ export async function updateTastingRecord(record: TastingRecord): Promise<Tastin
     flavors: (record.flavors ?? []).map(value => value.trim()).filter(Boolean), field_metadata: record.fieldMetadata,
     tasted_on: day, tasted_at: new Date(`${day}T12:00:00`).toISOString(), photo_ids: record.photoIds ?? [],
   };
-  const update = (values: typeof payload | Omit<typeof payload, "field_metadata">) => db.from(COLLECTION).update(values)
+  const update = (values: Partial<typeof payload>) => db.from(COLLECTION).update(values)
     .eq("id", record.id).eq("user_id", userId).is("deleted_at", null)
     .eq("updated_at", record.updatedAt ?? record.createdAt ?? "").select("*");
-  let { data, error } = await update(payload);
-  if (error && isMissingRecordMetadataColumn(error)) {
-    ({ data, error } = await update(withoutRecordMetadata(payload)));
+  const values: Partial<typeof payload> = { ...payload };
+  let data: unknown[] | null = null;
+  let error: { message?: string; code?: string } | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    ({ data, error } = await update(values));
+    if (!error) break;
+    const missing = missingOptionalRecordColumn(error);
+    if (!missing || !(missing in values)) break;
+    delete values[missing];
   }
   if (error) throw error;
   if (!data?.length) throw new Error("记录已被修改或删除，请刷新后再编辑");

@@ -628,13 +628,16 @@
 .auth-message.error { background: #f5e5e8; color: #8a2344; }
 .auth-terms { margin: 24px 14px 0; color: #a0958e; font-size: 8px; line-height: 1.6; text-align: center; }
 
-.records-content { padding-bottom: 74px; }
+.wine-app .flow-content.records-content { padding-top: 87px; padding-bottom: 74px; }
 .records-header-dock {
-  position: sticky;
+  position: absolute;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 8;
-  margin: -64px -20px 18px;
-  padding: 64px 20px 0;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 24px 20px 8px;
   background: var(--paper, #fbf7ef);
 }
 .records-header-dock .flow-header { margin-bottom: 0; }

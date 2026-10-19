@@ -23,6 +23,8 @@ test.beforeEach(async ({ page }) => {
       select(){return q},limit(){return q},order(){return q},range(){return q},eq(k,v){filters.push(r=>r[k]===v);return q},is(k,v){filters.push(r=>r[k]===v);return q},
       update(value){updates=value;return q},insert(value){insertion=value;return q},upsert(){return q},
       then(resolve){if(window.failDelete && updates?.deleted_at)return Promise.resolve({data:null,error:new Error('测试网络失败')}).then(resolve);
+        if(window.legacyRecordColumns && updates?.field_metadata)return Promise.resolve({data:null,error:{code:'PGRST204',message:"Could not find the 'field_metadata' column of 'tasting_records' in the schema cache"}}).then(resolve);
+        if(window.legacyRecordColumns && updates?.grapes)return Promise.resolve({data:null,error:{code:'PGRST204',message:"Could not find the 'grapes' column of 'tasting_records' in the schema cache"}}).then(resolve);
         if(table!=='tasting_records')return Promise.resolve({data:[],error:null}).then(resolve);
         if(insertion)rows.push({...insertion,deleted_at:null});
         const found=rows.filter(r=>filters.every(f=>f(r)));if(updates)found.forEach(r=>Object.assign(r,updates,{updated_at:new Date().toISOString()}));
@@ -43,7 +45,7 @@ test('edit actual date preserves creation time, delete recomputes profile', asyn
   await expect(page.getByLabel('酒款名称')).toHaveValue('测试酒');
   await page.getByRole('button', { name: '继续写品酒感受' }).click();
   await expect(page.getByText('你的感受', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: /品鉴时间/ }).click();
+  await page.locator('.taste-wine-summary .tasting-date-control button').click();
   await page.getByLabel('品鉴日期', { exact: true }).fill('2025-08-01');
   await page.getByRole('button', { name: '保存修改' }).click();
   await expect(page.getByText(/品鉴于 2025年8月1日/)).toBeVisible();
@@ -56,6 +58,34 @@ test('edit actual date preserves creation time, delete recomputes profile', asyn
   await page.getByRole('button', { name: '返回', exact: true }).click();
   await expect(page.getByRole('button', { name: '查看0条品鉴记录' })).toBeVisible();
   await page.screenshot({ path: '../docs/evidence/tasting-record-deleted.png' });
+});
+
+test('editing saves on legacy record columns and keeps the record header pinned', async ({ page }) => {
+  await page.evaluate(() => { (window as any).legacyRecordColumns = true; });
+  await page.getByRole('button', { name: '我的', exact: true }).click();
+  await page.getByRole('button', { name: '查看1条品鉴记录' }).click();
+  const header = page.locator('.records-header-dock');
+  await expect(header).toBeVisible();
+  const headerTop = (await header.boundingBox())!.y;
+  const screen = (await page.getByTestId('device-screen').boundingBox())!;
+  const screenTop = screen.y;
+  expect(headerTop - screenTop).toBeLessThan(30);
+  const timeline = page.locator('.timeline-year');
+  const timelineTop = (await timeline.boundingBox())!.y;
+  await page.locator('.records-content').evaluate(element => { (element as HTMLElement).style.minHeight = '1800px'; });
+  await page.mouse.move(screen.x + screen.width / 2, screen.y + screen.height / 2);
+  await page.mouse.wheel(0, 400);
+  await expect.poll(async () => (await timeline.boundingBox())!.y).toBeLessThan(timelineTop - 50);
+  await expect.poll(async () => Math.abs((await header.boundingBox())!.y - headerTop)).toBeLessThan(2);
+  await page.mouse.wheel(0, -400);
+  await openRecordDrawer(page);
+  await page.getByRole('button', { name: '编辑记录', exact: true }).click();
+  await page.getByRole('button', { name: '继续写品酒感受' }).click();
+  await page.getByLabel('品酒笔记').fill('修改后的感受');
+  await page.getByRole('button', { name: '保存修改' }).click();
+  await expect(page.getByRole('heading', { name: '我的品鉴记录' })).toBeVisible();
+  await expect(page.getByText('修改后的感受')).toBeVisible();
+  expect(await page.evaluate(() => (window as any).testRows[0].note)).toBe('修改后的感受');
 });
 
 test('delete failure restores the visible record', async ({ page }) => {

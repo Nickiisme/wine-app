@@ -64,6 +64,7 @@
 .taste-save-bar { position: absolute; z-index: 12; left: 0; right: 0; box-sizing: border-box; padding: 12px 20px calc(10px + env(safe-area-inset-bottom, 0px)); background: rgba(251, 247, 239, .97); border-top: 1px solid rgba(102, 83, 73, .12); box-shadow: 0 -8px 22px rgba(65, 44, 37, .04); backdrop-filter: blur(10px); }
 .taste-save-bar .primary-action { margin-top: 0; }
 .taste-save-bar .save-requirement { margin: 0 0 8px; }
+.taste-save-bar .taste-save-error { margin: 0 0 8px; color: #8a2344; font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; }
 .taste-save-bar .helper-copy { margin: 0 0 8px; text-align: center; }
 .taste-save-bar .primary-action:disabled { opacity: .5; box-shadow: none; }
 
