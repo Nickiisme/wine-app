@@ -66,6 +66,65 @@
 .taste-save-bar .save-requirement { margin: 0 0 8px; }
 .taste-save-bar .helper-copy { margin: 0 0 8px; text-align: center; }
 .taste-save-bar .primary-action:disabled { opacity: .5; box-shadow: none; }
+
+/* Tasting note layout: wine context first, then a compact set of choices. */
+.wine-app .taste-content { padding: 83px 19px 150px; }
+.taste-wine-summary { display: grid; grid-template-columns: 68px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-width: 0; padding: 7px 0 12px; border-bottom: 1px solid var(--line); }
+.taste-wine-thumb { width: 68px; height: 68px; overflow: hidden; border-radius: 10px; background: #efe8dc; color: var(--wine); display: grid; place-items: center; }
+.taste-wine-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.taste-wine-thumb svg { width: 26px; height: 26px; }
+.taste-wine-copy { display: grid; gap: 3px; min-width: 0; }
+.taste-wine-copy strong { color: #14213b; font-size: 14px; line-height: 1.25; }
+.taste-wine-copy span, .taste-wine-copy small { color: #778094; font-size: 11px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.taste-wine-summary .tasting-date-control { margin: 0; align-self: stretch; display: flex; align-items: center; }
+.taste-wine-summary .tasting-date-control > button { width: auto; max-width: 85px; padding: 0; border: 0; color: #707a8c; font-size: 12px; white-space: nowrap; }
+.taste-wine-summary .tasting-date-control > button > span, .taste-wine-summary .tasting-date-control > small { display: none; }
+.taste-wine-summary .tasting-date-control > button strong { font-weight: 500; }
+.taste-content .question-block { margin-top: 16px; }
+.taste-content .question-block h2 { margin: 0; color: #14213b; font-size: 17px; line-height: 1.3; font-weight: 750; }
+.taste-content .question-title { margin-bottom: 12px; }
+.taste-content .question-title > span { color: #7c8494; font-size: 11px; }
+.taste-choice-row { gap: 7px; }
+.taste-content .taste-choice-row button { min-width: 0; min-height: 48px; padding: 0 4px; border-radius: 13px; color: #586176; font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.taste-choice-row button svg { width: 18px; height: 18px; flex: none; }
+.taste-body-block .body-range { margin-top: 0; }
+.taste-body-block .body-range-labels { margin-top: -1px; }
+.taste-body-block .body-range-labels span { position: relative; padding-top: 8px; font-size: 10px; }
+.taste-body-block .body-range-labels span::before { content: ""; width: 1px; height: 6px; position: absolute; top: 0; left: 50%; background: #9298a4; }
+.taste-content .taste-flavor-grid { gap: 7px; }
+.taste-content .taste-flavor-grid button { min-width: 0; min-height: 43px; padding: 4px 3px; border-radius: 13px; color: #1a2941; font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.taste-content .taste-flavor-grid button svg { width: 16px; height: 16px; flex: none; color: var(--wine); }
+.taste-content .note-heading { margin-bottom: 10px; }
+.taste-note-field { position: relative; }
+.wine-app .taste-note-field textarea { display: block; width: 100%; height: 86px; min-height: 86px; padding: 11px 13px 27px; border-radius: 11px; background: transparent; color: #14213b; }
+.taste-note-field > small { position: absolute; right: 10px; bottom: 8px; color: #9da2aa; font-size: 9px; pointer-events: none; }
+.taste-photo-block .note-photos { margin-top: 0; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+.taste-photo-block .note-photos figure, .taste-photo-block .add-note-photo { border-radius: 10px; }
+.taste-photo-block .add-note-photo { border: 1px dashed #d4c8bd; background: transparent; }
+.taste-photo-block .add-note-photo svg { width: 21px; height: 21px; }
+.taste-photo-block .photo-help { margin-top: 8px; text-align: left; }
+.taste-save-bar { padding: 10px 19px calc(10px + env(safe-area-inset-bottom, 0px)); }
+.taste-save-bar .primary-action { height: 47px; border-radius: 12px; font-size: 15px; }
+
+.bottom-sheet:has(.taste-aroma-sheet) { height: min(76%, 700px); }
+.bottom-sheet:has(.taste-aroma-sheet) .sheet-header { padding: 1px 18px 12px; }
+.bottom-sheet:has(.taste-aroma-sheet) .sheet-title { color: #14213b; font-size: 22px; }
+.bottom-sheet:has(.taste-aroma-sheet) .sheet-description { color: #788093; font-size: 12px; }
+.bottom-sheet:has(.taste-aroma-sheet) .sheet-content { display: flex; flex: 1; min-height: 0; overflow: hidden; padding: 0 16px 18px; }
+.taste-aroma-sheet { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.taste-aroma-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-content: start; gap: 7px; min-height: 0; overflow-y: auto; padding: 2px 0 8px; }
+.taste-aroma-options button { position: relative; display: grid; justify-items: center; align-content: center; gap: 4px; min-width: 0; min-height: 67px; padding: 5px 2px; border: 1px solid #ddd7d1; border-radius: 12px; background: #fff; color: #14213b; font-size: 11px; }
+.taste-aroma-options button svg:first-child { width: 22px; height: 22px; color: #af7f6d; }
+.taste-aroma-options button.selected { border-color: #a81643; background: #fcf0f3; color: #911339; font-weight: 700; }
+.taste-aroma-options .taste-aroma-check { position: absolute; top: 4px; right: 4px; width: 14px; height: 14px; padding: 2px; border-radius: 50%; background: var(--wine); color: #fff; }
+.taste-aroma-custom { flex: none; display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 0 10px; border: 1px solid #d9d2cd; border-radius: 11px; }
+.taste-aroma-custom > svg { flex: none; color: var(--wine); }
+.taste-aroma-custom input { width: 100%; min-width: 0; height: 44px; border: 0; background: transparent; outline: 0; }
+.taste-aroma-custom button { flex: none; border: 0; background: transparent; color: var(--wine); font-size: 11px; }
+.taste-aroma-actions { flex: none; display: grid; gap: 7px; padding-top: 10px; color: #576176; font-size: 11px; }
+.taste-aroma-actions strong { color: var(--wine); }
+.taste-aroma-actions > button { min-height: 45px; border: 0; border-radius: 11px; background: var(--wine); color: #fff; font-size: 15px; font-weight: 700; }
+@media (max-width: 360px) { .taste-choice-row button { gap: 4px; font-size: 11px; } .taste-wine-summary { grid-template-columns: 58px minmax(0, 1fr) auto; gap: 8px; } .taste-wine-thumb { width: 58px; height: 58px; } }
 .body-choice-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
 .body-choice-row button { min-width: 0; min-height: 43px; padding: 2px; border: 1px solid #ded5c7; border-radius: 13px; background: #fffaf3; color: #766b64; font-size: 10px; line-height: 1.2; }
 .body-choice-row button.selected { font-weight: 700; }
