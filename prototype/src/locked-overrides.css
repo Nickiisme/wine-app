@@ -2,6 +2,13 @@
   min-height: 1040px;
 }
 
+/* Denser home path: preserve artwork size and alternate columns. */
+.grape-atlas > .grape-node { margin-top: calc(var(--grape-node-step, 113px) - 116px); }
+.grape-atlas > .grape-node:first-of-type { margin-top: 0; }
+.welcome .stats { margin-top: 10px; font-size: 13px; line-height: 1.5; letter-spacing: 0; }
+.welcome .stats strong { font-size: 18px; }
+.welcome .stats i { margin: 0 2px; }
+
 .wine-app .explore-content:not(.region-explore-content) {
   overflow: visible;
 }

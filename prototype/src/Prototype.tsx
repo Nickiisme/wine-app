@@ -672,7 +672,8 @@ function ExploreScreen({ tab, records, recordsLoaded, account, dismissedPrompt, 
   const hasFirstRecord = stats.recordCount === 1;
   const promptKind = hasNoRecords ? "empty" : hasFirstRecord ? "first" : null;
   const promptOpen = promptKind !== null && dismissedPrompt !== promptKind;
-  const greeting = hasNoRecords ? "你的葡萄酒世界，从第一杯开始" : hasFirstRecord ? "你的葡萄酒世界已经点亮" : account && !account.isAnonymous ? `晚上好，${account.name} 🍷` : "晚上好 🍷";
+  const username = account && !account.isAnonymous ? account.name.trim() : "";
+  const greeting = username ? `${username}的葡萄酒世界` : "你的葡萄酒世界";
   useEffect(() => {
     const scroll = contentRef.current?.closest(".mobile-scroll");
     const anchor = tabsAnchorRef.current;
@@ -698,7 +699,7 @@ function ExploreScreen({ tab, records, recordsLoaded, account, dismissedPrompt, 
   return <>
     <MobileScroll className={`app-scroll paper-screen ${tab === "regions" ? "region-page" : ""}`}>
       <main ref={contentRef} className={`explore-content ${tab === "regions" ? "region-explore-content" : ""}`} style={tab === "regions" && regionViewport.height ? { "--region-viewport-height": `${regionViewport.height}px`, "--region-collapse-distance": `${regionViewport.collapse}px` } as CSSProperties : undefined}>
-        <header className={`welcome ${hasNoRecords ? "empty-welcome" : ""}`}><p className="eyebrow">{greeting}</p><h1>{hasNoRecords ? "每记录一种葡萄，它就会在这里被点亮。" : "你的葡萄酒世界已点亮："}</h1><p className="stats"><strong>{stats.grapeCount}</strong> 个品种 <i>·</i> <strong>{stats.regionCount}</strong> 个产区 <i>·</i> <strong>{stats.recordCount}</strong> 次品鉴</p></header>
+        <header className={`welcome ${hasNoRecords ? "empty-welcome" : ""}`}><p className="eyebrow">{greeting}</p><p className="stats">已点亮 <strong>{stats.grapeCount}</strong> 个品种 <i>·</i> <strong>{stats.regionCount}</strong> 个产区 <i>·</i> <strong>{stats.recordCount}</strong> 次品鉴</p></header>
         <div ref={tabsAnchorRef}><AtlasTabs tab={tab} onTab={onTab} inactive={tabsPinned} /></div>
         {tab === "grapes" ? <GrapeAtlas records={records} onSelect={setSelectedGrape} onAll={onAllGrapes} /> : <RegionMap records={records} onRecords={onRegionNotes} />}
       </main>
@@ -733,7 +734,8 @@ function GrapeAtlas({ records, onSelect, onAll }: { records: TastingRecord[]; on
   const latestGrape = records[0] ? recordGrapeNames(records[0])[0] : undefined;
   const coreNames = CORE_GRAPES.map((grape) => grape.chinese_name);
   const names = [...HOME_GRAPE_ORDER, ...coreNames.filter((name) => !HOME_GRAPE_ORDER.includes(name)), ...specialDiscoveries(records)];
-  const atlasHeight = Math.max(1040, names.length * 113 + 24);
+  const nodeStep = 86;
+  const atlasHeight = Math.max(780, names.length * nodeStep + 70);
   const pathHeight = Math.max(940, atlasHeight - 100);
   const choose = (name: string) => { setPressed(name); window.setTimeout(() => { setPressed(null); onSelect(name); }, 190); };
   const renderNode = (name: string, index: number) => {
@@ -743,7 +745,7 @@ function GrapeAtlas({ records, onSelect, onAll }: { records: TastingRecord[]; on
     const recent = latestGrape === name;
     return <button key={name} onClick={() => choose(name)} className={`grape-node ${index % 2 ? "right" : "left"} ${locked ? "locked" : ""} ${recent ? "recent" : ""} ${pressed === name ? "pressed" : ""}`} aria-label={`${name}${locked ? "，待探索" : `，品鉴过${counts[name]}次`}`}><span className="grape-art-wrap"><GrapeIllustration name={name} image={core?.image ?? special?.image} locked={locked} priority={index < 6} />{!locked && <span className="taste-count">{formatCount(counts[name])}</span>}{recent && <span className="recent-spark">✦</span>}{locked && <span className="locked-mark">?</span>}</span><strong>{name}</strong><small>{special ? "特别发现" : core?.english_name}{locked ? " · 待探索" : ""}</small></button>;
   };
-  return <section className="grape-atlas" style={{ minHeight: atlasHeight }} aria-label="葡萄品种探索路径"><svg className="path-line" style={{ height: pathHeight }} viewBox="0 0 180 940" preserveAspectRatio="none" aria-hidden="true"><path d="M88 4 C158 72 154 150 86 220 S18 365 92 438 S156 580 82 650 S20 794 92 936" /></svg>{names.map(renderNode)}<button className="all-grapes-link atlas-path-link" onClick={onAll}>查看全部品种 <span>24 种核心葡萄 ›</span></button></section>;
+  return <section className="grape-atlas" style={{ minHeight: atlasHeight, "--grape-node-step": `${nodeStep}px` } as CSSProperties} aria-label="葡萄品种探索路径"><svg className="path-line" style={{ height: pathHeight }} viewBox="0 0 180 940" preserveAspectRatio="none" aria-hidden="true"><path d="M88 4 C158 72 154 150 86 220 S18 365 92 438 S156 580 82 650 S20 794 92 936" /></svg>{names.map(renderNode)}<button className="all-grapes-link atlas-path-link" onClick={onAll}>查看全部品种 <span>24 种核心葡萄 ›</span></button></section>;
 }
 
 function AllGrapesScreen({ records, onBack, onNotes }: { records: TastingRecord[]; onBack: () => void; onNotes: (grape: string) => void }) {

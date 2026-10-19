@@ -1,4 +1,21 @@
-# Label-camera layout QA — 2026-10-18
+# Cellar collection layout QA — 2026-10-19
+
+- Source visual truth: `/var/folders/97/_xk916z5461gmldt5xzpfsg00000gn/T/codex-clipboard-eda307eb-cdd7-44dd-917e-e1a19072ca18.png` (957 × 1643).
+- Implementation: http://127.0.0.1:4175/; local Vite preview started.
+- Intended state: in-stock collection, three photo columns, purchase-cost value, missing-price note.
+- Implementation screenshot: unavailable. The in-app browser denied access to the local page under its URL security policy. No alternate browser or bypass was attempted.
+- Viewport/density normalization, full-view comparison, and focused region comparison: blocked; no visual pass claimed from source inspection or build success.
+- Typography, spacing, palette, image crop, and copy: implemented from the reference using existing app tokens and real saved photos; rendered evaluation remains pending.
+- Intentional differences: retain country/region as a small extra line; preserve system header/navigation; currencies are separate totals, not an unrequested exchange-rate conversion. An all-unpriced collection shows “—” instead of misleading zero, with the missing-price count.
+- Calculation verified by four new tests: reference total ¥794; multiple bottles and decrement; missing-price counts by entry; consumed stock excluded; zero-price entries included; currencies separated; decimal arithmetic.
+- Regression checks: runtime integrity (28 protected files), TypeScript, production build, and 14 business/auth/date/value tests passed. No schema or inventory-transaction changes.
+- UI interaction/console verification: blocked with browser access; existing callbacks for detail, edit, add, and opening bottles retained.
+
+final result: blocked
+
+---
+
+# Previous: Label-camera layout QA — 2026-10-18
 
 - Source visual truth: `/var/folders/97/_xk916z5461gmldt5xzpfsg00000gn/T/codex-clipboard-b6b91b96-70ff-4026-8c6f-366b917dfeef.png` (864 × 1821).
 - Implementation screenshot: `camera-layout-preview.png` (393 × 720 CSS/pixel crop, no device chrome; browser viewport 1280 × 720).
