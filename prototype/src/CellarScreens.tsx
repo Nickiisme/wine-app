@@ -33,7 +33,6 @@ export function CellarListScreen({ entries, loading, error, onBack, onAdd, onOpe
     <div className="cellar-tabs" role="tablist" aria-label="藏酒状态"><button role="tab" aria-selected={status === "stored"} className={status === "stored" ? "active" : ""} onClick={() => setStatus("stored")}>在藏 <span>{entries.filter((entry) => entry.quantityRemaining > 0).length}</span></button><button role="tab" aria-selected={status === "consumed"} className={status === "consumed" ? "active" : ""} onClick={() => setStatus("consumed")}>已饮用 <span>{entries.filter((entry) => entry.quantityRemaining === 0).length}</span></button></div>
     <section className="cellar-value" aria-label="在藏葡萄酒购买总价值" aria-live="polite">
       <div className="cellar-value-line"><span>藏酒总价值</span><div className="cellar-value-amounts">{valueUnavailable ? <strong>—</strong> : value.totals.length ? value.totals.map((total) => <strong key={total.currency}>{formatCellarMoney(total.amount, total.currency)}</strong>) : <strong>{value.missingPriceCount ? "—" : "¥0"}</strong>}</div><small>按购买价计算</small></div>
-      {!valueUnavailable && value.missingPriceCount > 0 && <p>{value.missingPriceCount}款未填价格</p>}
       {!valueUnavailable && value.totals.length > 1 && <p>不同币种分别统计，未作汇率换算</p>}
     </section>
     <div className="cellar-list-heading"><p>{status === "stored" ? `还有 ${entries.reduce((sum, entry) => sum + entry.quantityRemaining, 0)} 瓶，等下一次举杯` : "每一瓶都留下了故事"}</p><button onClick={onAdd}><PlusIcon />添加藏酒</button></div>

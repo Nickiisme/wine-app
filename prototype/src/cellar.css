@@ -1,5 +1,5 @@
 .cellar-page { padding-bottom: 118px; }
-.wine-app .flow-content.cellar-collection-page { padding-top: 12px; }
+.wine-app .flow-content.cellar-collection-page { padding-top: 86px; }
 .cellar-tabs { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #e4dcd0; border-radius: 10px; background: #f3efe9; overflow: hidden; }
 .cellar-tabs button { min-height: 38px; border: 0; border-radius: 9px; background: transparent; color: #716b66; font-size: 14px; }
 .cellar-tabs button.active { background: #7e1637; color: #fff; font-weight: 600; }
