@@ -21,6 +21,14 @@ API Key. It uses CloudBase authentication and PostgreSQL RLS instead.
    history, link cellar tastings, and install the two atomic inventory functions.
    This migration is required before “我的藏酒” can load or save cloud data.
 
+9. Run `postgresql-record-lifecycle.sql` for calendar dates, soft deletion and immutable linkage.
+10. Apply `postgresql-cellar-idempotency.sql` **last**, together with the matching Web client release.
+    It also repairs missing grapes/field_metadata columns, adds a private receipt ledger and installs
+    `consume_cellar_entry_v2` / `save_cellar_tasting_v2`. Old keyless RPC signatures reject mutations
+    with CLIENT_UPGRADE_REQUIRED; they cannot safely distinguish retries from new actions.
+    Do not re-run the older cellar function definitions afterward: that would restore the unsafe endpoints.
+    Read `../../docs/cellar-backend-repair.md` before applying to an existing environment.
+
 Re-run the relevant SQL files after pulling schema or policy changes. Committing or
 deploying the web client does not apply PostgreSQL RLS policies automatically.
 

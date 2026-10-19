@@ -217,6 +217,8 @@ export default function Prototype() {
   const [tastingCellarId, setTastingCellarId] = useState<string | null>(null);
   const [cellarMovements, setCellarMovements] = useState<CellarMovement[]>([]);
   const [cellarOpenSheet, setCellarOpenSheet] = useState(false);
+  const cellarIntent = useRef(crypto.randomUUID());
+  const cellarSubmitLock = useRef(false);
   const [consumeMode, setConsumeMode] = useState<"mark" | "tasting">("mark");
   const [consumeDate, setConsumeDate] = useState(todayLocal);
   const [consumeQuantity, setConsumeQuantity] = useState("1");
@@ -439,6 +441,7 @@ export default function Prototype() {
   };
 
   const beginConsumption = (mode: "mark" | "tasting") => {
+    cellarIntent.current = crypto.randomUUID();
     setCellarOpenSheet(false);
     setConsumeMode(mode);
     setConsumeDate(todayLocal());
@@ -448,7 +451,7 @@ export default function Prototype() {
   };
 
   const submitConsumption = async () => {
-    if (!selectedCellar) return;
+    if (!selectedCellar || cellarSubmitLock.current) return;
     const quantity = Number(consumeQuantity);
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > selectedCellar.quantityRemaining) { setCellarActionError(`请选择 1–${selectedCellar.quantityRemaining} 瓶的实际饮用数量。`); return; }
     if (!consumeDate) { setCellarActionError("请选择饮用日期。"); return; }
@@ -471,14 +474,15 @@ export default function Prototype() {
     setCellarBusy(true);
     setCellarActionError(null);
     try {
-      await consumeCellarEntry(selectedCellar.id, quantity, consumeDate);
-      setCellarEntries((current) => current.map((entry) => entry.id === selectedCellar.id ? { ...entry, quantityRemaining: Math.max(0, entry.quantityRemaining - quantity) } : entry));
+      cellarSubmitLock.current = true;
+      const remaining = await consumeCellarEntry(selectedCellar.id, quantity, consumeDate, cellarIntent.current);
+      setCellarEntries((current) => current.map((entry) => entry.id === selectedCellar.id ? { ...entry, quantityRemaining: remaining } : entry));
       await refreshCellar().catch(() => {});
       setCellarMovements(await listCellarMovements(selectedCellar.id).catch(() => []));
       go("cellarDetail");
     } catch (error) {
       setCellarActionError(error instanceof Error ? error.message : "保存饮用记录失败");
-    } finally { setCellarBusy(false); }
+    } finally { cellarSubmitLock.current = false; setCellarBusy(false); }
   };
 
   const pendingRecord = (): TastingRecord => ({
@@ -512,10 +516,11 @@ export default function Prototype() {
   }, [knowledgeToast]);
 
   const saveTasting = async () => {
-    if (!recordCanBeSaved || savingRecord) return;
+    if (!recordCanBeSaved || savingRecord || cellarSubmitLock.current) return;
     try { validateTastingDate(tastedOn); } catch (error) { setCloudMessage((error as Error).message); return; }
     const previewRecord = pendingRecord();
     trackRecordEvent("record_save_clicked", getRecordAnalyticsProperties(previewRecord, inputMethod));
+    cellarSubmitLock.current = true;
     setSavingRecord(true);
     setCloudMessage(null);
     try {
@@ -556,6 +561,7 @@ export default function Prototype() {
         existingPhotoIds: tastingCellar?.photoIds,
         cellarEntryId: tastingCellar?.id,
         cellarQuantity: tastingCellar ? Number(consumeQuantity) : undefined,
+        cellarRequestId: tastingCellar ? cellarIntent.current : undefined,
         tastedOn,
         preference: liked ?? undefined,
         flavors: selectedFlavors,
@@ -569,10 +575,9 @@ export default function Prototype() {
       });
       setNewSpecialDiscovery(firstNewSpecialDiscovery(saved, records));
       setNewBadgeAward(getNewBadgeAward(records, saved, cellarEntries.reduce((sum, entry) => sum + entry.quantityPurchased, 0)));
-      setRecords((current) => [saved, ...current]);
+      setRecords((current) => [saved, ...current.filter(record => record.id !== saved.id)]);
       setSavedRecord(saved);
       if (tastingCellar) {
-        setCellarEntries((current) => current.map((entry) => entry.id === tastingCellar.id ? { ...entry, quantityRemaining: Math.max(0, entry.quantityRemaining - Number(consumeQuantity)) } : entry));
         await refreshCellar().catch(() => {});
         setCellarMovements(await listCellarMovements(tastingCellar.id).catch(() => []));
       }
@@ -586,7 +591,7 @@ export default function Prototype() {
       const detail = error instanceof Error ? error.message : typeof error === "object" && error && "message" in error ? String(error.message) : "未知错误";
       setCloudMessage(`保存失败：${detail}`);
     } finally {
-      setSavingRecord(false);
+      cellarSubmitLock.current = false; setSavingRecord(false);
     }
   };
 

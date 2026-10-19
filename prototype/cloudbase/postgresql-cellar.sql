@@ -1,3 +1,5 @@
+-- Base migration only: ALWAYS apply postgresql-cellar-idempotency.sql afterward.
+-- Do not run this alone over the repaired deployment (it would restore keyless mutations).
 -- Run in the CloudBase PostgreSQL SQL workspace after postgresql-permissions.sql
 -- and postgresql-record-metadata.sql. Re-running this migration is safe.
 -- Client code never receives a privileged database key.

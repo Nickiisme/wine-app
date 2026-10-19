@@ -1,4 +1,5 @@
 import { platform } from "../platform/web";
+import { runCellarRequest } from "./cellarRequestClient";
 import type { PhotoFile } from "../platform/photos";
 import { resolvePhotoUrls, uploadRecordPhotos } from "./tastingRecords";
 
@@ -157,10 +158,17 @@ export async function listCellarMovements(entryId: string): Promise<CellarMoveme
   }));
 }
 
-export async function consumeCellarEntry(entryId: string, quantity: number, eventDate: string): Promise<void> {
-  const { getCloudbasePostgres } = await cloud();
-  const db = getCloudbasePostgres() as unknown as { rpc: (name: string, args: Record<string, unknown>) => Promise<{ error: Error | null }> };
+export async function consumeCellarEntry(entryId: string, quantity: number, eventDate: string, requestId: string): Promise<number> {
+  const { ensureCloudbaseUser, getCloudbasePostgres } = await cloud();
+  const userId = await ensureCloudbaseUser();
+  const db = getCloudbasePostgres() as unknown as { rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: Error | null }> };
   if (typeof db.rpc !== "function") throw new Error("当前 CloudBase SDK 不支持藏酒事务，请更新 SDK 后重试");
-  const { error } = await db.rpc("consume_cellar_entry", { p_entry_id: entryId, p_quantity: quantity, p_event_date: eventDate });
-  if (error) throw migrationError(error);
+  try {
+    const saved = await runCellarRequest({ userId, entryId, intentId: requestId,
+      fingerprint: JSON.stringify([entryId, quantity, eventDate]), rpcName: "consume_cellar_entry_v2",
+      prepare: async () => ({ p_entry_id: entryId, p_quantity: quantity, p_event_date: eventDate, p_request_id: requestId }),
+      rpc: (name, args) => db.rpc(name, args),
+    });
+    return saved.result!.quantity_remaining;
+  } catch (error) { throw migrationError(error); }
 }
